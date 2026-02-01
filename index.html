@@ -43,7 +43,9 @@
         .post {
             padding: 12px 24px;
             border-top: 1px solid #38444D;
-            display: block;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
             h1 {
                 font-size: 100%;
                 margin: 0;
@@ -53,6 +55,7 @@
                 word-break: break-word;
             }
             button {
+                align-self: end;
                 margin: -4px;
                 margin-top: 4px;
                 padding: 4px;
@@ -367,7 +370,7 @@
     function getNextPost() {
         const potentialPosts = [...Array(10000)].map(e=>pagesArr[Math.floor(Math.random()*pagesArr.length)]).map(post => {
             const initialScore = (post.thumb ? 5 : 0) + (3**(post.seen??0)-1)*-50000;
-            const postScore = post.allCategories.reduce((sum, cat) => sum + (categoryScores[cat]??0), initialScore);
+            const postScore = [...post.allCategories].reduce((sum, cat) => sum + (categoryScores[cat]??0), initialScore);
             // intentionally do this to the original obj instance
             post.score = postScore;
             return post;
@@ -376,7 +379,7 @@
         let highestScore = -Infinity;
         let bestPost = potentialPosts[0];
 
-        if (Math.random() < 0.3) {
+        if (Math.random() < 0.4) {
             const minScore = Math.min(potentialPosts.map(e=>e.score));
             const maxScore = potentialPosts.reduce((sum, post) => sum + post.score - minScore, 0);
             const targetScore = Math.random()*maxScore;
@@ -457,20 +460,26 @@ async function* streamToAsyncIterable(stream) {
 
         const subCategories = smoldata.subCategories;
         noPageMaps = smoldata.noPageMaps;
-        const tempPages = smoldata.pages.map(e => ({title:e[0],id:e[1],text:e[2],thumb:e[3],categories:e[4],links:e[5]}));
+        delete smoldata.subCategories;
+        delete smoldata.noPageMaps;
 
         let i = 0;
-        const wikiLen = tempPages.length;
+        const wikiLen = smoldata.pages.length;
         console.log(wikiLen);
         const loading = document.querySelector("#loading");
         let lastFrame = Date.now();
-        for (const tempPage of tempPages) {
+        while (smoldata.pages.length) {
+            const e = smoldata.pages.pop();
+            const tempPage = {title:e[0],id:e[1],text:e[2],thumb:e[3],categories:e[4],links:e[5]};
             if (i % 1000 == 0 && Date.now() - lastFrame > 20) {
                 startBtn.innerText = `Xikipedia is loading... (${(i/wikiLen*100).toFixed(0)}%)`;
                 await new Promise(e => requestAnimationFrame(e));
             }
             i++;
-            tempPage.allCategories = [...recursiveCategories(subCategories, [...tempPage.categories], 0), `p:${tempPage.id}`, ...tempPage.links.map(e=>`p:${e}`)];
+            //tempPage.allCategories = [...recursiveCategories(subCategories, [...tempPage.categories], 0), `p:${tempPage.id}`, ...tempPage.links.map(e=>`p:${e}`)];
+            tempPage.allCategories = new Set(recursiveCategories(subCategories, [...tempPage.categories], 0));
+            tempPage.allCategories.add(`p:${tempPage.id}`);
+            tempPage.allCategories.add(...tempPage.links.map(e=>`p:${e}`));
             pagesArr.push(tempPage);
         }
         loading.remove();
