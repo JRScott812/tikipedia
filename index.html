@@ -6,8 +6,8 @@
     <title>Xikipedia</title>
     <meta property="og:url" content="https://xikipedia.org/">
     <meta property="og:title" content="Xikipedia">
-    <meta name="description" content="Wikipedia as a social media feed">
-    <meta property="og:description" content="Wikipedia as a social media feed">
+    <meta name="description" content="Wikipedia you can doomscroll">
+    <meta property="og:description" content="Wikipedia you can doomscroll">
     <meta property="og:locale" content="en-us">
     <meta property="og:type" content="website">
     <meta content="#38444D" name="theme-color" />
@@ -319,6 +319,7 @@
         document.body.appendChild(fullImg);
         fullImg.showPopover();
         fullImg.ontoggle = (e) => e.newState === "open" || fullImg.remove();
+        fullImg.onclick = fullImg.hidePopover();
     }
 
     function createNextPost() {
@@ -489,7 +490,12 @@ async function* streamToAsyncIterable(stream) {
         startBtn.onclick = () => {
             startScreen.hidePopover();
             document.querySelectorAll(".categoryPicker>input:checked").forEach(e => categoryScores[e.dataset.category] = defaultCategories.includes(e.dataset.category) ? 1000 : 5000);
-            //document.querySelectorAll(".categoryPicker>input:checked").forEach(e => engagePost(pagesArr.find(x=>x.title.toLowerCase()==e.dataset.category), 1000));
+            document.querySelectorAll(".categoryPicker>input:checked").forEach(e => {
+                if (defaultCategories.includes(e.dataset.category)) return;
+                const page = pagesArr.find(x=>x.title.toLowerCase()==e.dataset.category);
+                if (page)
+                    engagePost(page, 100);
+            });
             startScreen.remove();
             requestAnimationFrame(render);
         }
