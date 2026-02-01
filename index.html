@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Xikipedia</title>
+    <meta property="og:url" content="https://xikipedia.org/">
+    <meta property="og:title" content="Xikipedia">
+    <meta name="description" content="Wikipedia as a social media feed">
+    <meta property="og:description" content="Wikipedia as a social media feed">
+    <meta property="og:locale" content="en-us">
+    <meta property="og:type" content="website">
+    <meta content="#38444D" name="theme-color" />
+    <style>
+        html, body {
+            background: #15202B;
+            color: #FFF;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+        }
+        .posts {
+            max-width: 600px;
+            width: 100vw;
+            border: 1px solid #38444D;
+            border-top: none;
+            height: fit-content;
+            &:has(.post) {
+                margin-bottom: 1000px;
+            }
+        }
+        .stats {
+            max-width: 300px;
+            border: 1px solid #38444D;
+            border-radius: 8px;
+            position: fixed;
+            left: calc(50% + 330px);
+            top: 20px;
+            padding: 8px;
+        }
+        .post {
+            padding: 12px 24px;
+            border-top: 1px solid #38444D;
+            display: block;
+            h1 {
+                font-size: 100%;
+                margin: 0;
+            }
+            p {
+                margin: 0;
+                word-break: break-word;
+            }
+            button {
+                margin: -4px;
+                margin-top: 4px;
+                padding: 4px;
+                background: #FFF0;
+                transition: background 0.2s, scale 0.2s cubic-bezier(.15,.67,0,1);
+                border-radius: 64px;
+                &:hover:not([data-liked]) {
+                    background: #FFF2;
+                    scale: 1.1;
+                }
+                &:active:not([data-liked]), &:active {
+                    scale: 0.9;
+                }
+                font-size: 0;
+                border: 0;
+                &::after {
+                    font-size: 16px;
+                    display: block;
+                    width: 24px;
+                    height: 24px;
+                    margin-top: 1px;
+                    margin-bottom: -1px;
+                    content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.06,21.01c3.94,0,13.77-11.36,8.56-16.37-4.59-4.41-8.61,1.58-8.61,1.58,0,0-4.02-5.99-8.61-1.58-5.22,5.01,4.61,16.37,8.56,16.37h.11Z" stroke-width="2" fill="none" stroke="%2389A" stroke-linejoin="round"/></svg>') / "Like";
+                    cursor: pointer;
+/*                    filter: saturate(0) brightness(3) contrast(2) invert(1);*/
+                }
+                &[data-liked]::after {
+                    content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.06,21.01c3.94,0,13.77-11.36,8.56-16.37-4.59-4.41-8.61,1.58-8.61,1.58,0,0-4.02-5.99-8.61-1.58-5.22,5.01,4.61,16.37,8.56,16.37h.11Z" stroke-width="2" fill="red" stroke="red"/></svg>') / "Like";
+                }
+            }
+            img.media {
+                border-radius: 16px;
+                border: 1px solid #38444D;
+                display:block;
+                margin: 8px 0;
+                max-width: min(512px, 100%);
+                max-height: 330px;
+                background:#FFF;
+            }
+            cursor: pointer;
+            &:hover {
+                background: #1C2732;    
+            }
+        }
+        .fullImg {
+            max-height: 95%;
+            max-width: 95%;
+            min-width: 25%;
+            min-height: 25%;
+        }
+        body ::backdrop {
+            background: #0009;
+        }
+        #startScreen {
+            display: flex;
+            flex-direction: column;
+            background: #15202B;
+            border:none;
+            width: 90%;
+            height:90%;
+            max-width: 600px;
+            color: #fff;
+            border-radius: 8px;
+            padding: 32px;
+            box-sizing: border-box;
+            h1,h2 {
+                margin: 0;
+            }
+        }
+        #categoryPickList {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .categoryPicker {
+            border-radius: 100px;
+            cursor: pointer;
+            padding: 4px 4px 4px 8px;
+            display:inline-flex;
+            justify-content: space-between;
+            align-items: center;
+            &::after {
+                content: "+";
+                color: #2cafff;
+                font-size: 150%;
+                line-height: 0;
+                margin-left: 8px;
+            }
+            &:hover, &:active { background: #0008; }
+            &:has(input:checked) {
+              background: #FFF;
+              color: #000;
+              &::after {
+                content: "−";
+                color: #000;
+              }
+            }
+            &:has(input:focus-visible) {
+              outline: 2px solid #2cafff;
+            }
+            box-shadow: inset 0px 0px 1.2px 0px #000;
+            padding: 10px;
+            cursor: pointer;
+            background: #000;
+
+            input {
+              opacity: 0;
+              position: absolute;
+              pointer-events: none;
+            }
+        }
+        #startBtn {
+            border-radius: 32px;
+            padding: 12px;
+            background: #2cafff;
+            color: #FFF;
+            border: 1px solid #000;
+            font: inherit;
+            cursor: pointer;
+            &[disabled] {
+                background: #557;
+                cursor: not-allowed;
+            }
+        }
+        #categorySearch {
+            margin: 8px 0;
+            gap: 8px;
+            input {
+                border-radius: 32px;
+                padding: 12px;
+                background: #000;
+                color: #FFF;
+                border: 1px solid #000;
+                font: inherit;
+                &[disabled] {
+                    background: #557;
+                    cursor: not-allowed;
+                }
+            }
+            select:not(:has(option)) {
+                display: none;
+            }
+        }
+        a[href] {
+            color: #2cafff;
+        }
+    </style>
+</head>
+<body>
+    <p id="loading">Loading...</p>
+    <div class="posts"></div>
+    <div class="stats"></div>
+    <div id="startScreen" popover=manual>
+        <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
+        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared here, the algorithm runs locally and the data disappears once you refresh or close the tab.</p>
+        <p style="font-weight: 600;margin:0">Pick some categories to get started (optional)</p>
+        <div id="categoryPickList"></div>
+        <p style="font-weight: 600;margin:0">Or add your own</p>
+        <div id="categorySearch" style="display:flex;flex-direction:column">
+            <input placeholder="Estonia..." disabled />
+            <select size="5">
+            </select>
+        </div>
+        <p style="margin-top:auto">Since the content and images shown is from random Wikipedia articles, you will likely see NSFW content. Please only continue if you're an adult.</p>
+        <button id="startBtn" disabled>I'm an adult, continue</button>
+    </div>
+<script type="text/javascript">
+    const pagesArr = [];
+    let noPageMaps = {};
+    const recursiveCache = new Map();
+    const categoryScores = {
+        "given names": -1000,
+        "surnames": -1000,
+    };
+    const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
+    let postsWithoutLike = 0;
+    const DATA_SIZE = 225690064;
+
+    const startBtn = document.getElementById("startBtn");
+    const categoryPickList = document.getElementById("categoryPickList");
+    const categorySearch = document.getElementById("categorySearch");
+    const categorySearchInput = categorySearch.querySelector("input");
+    const categorySearchSelect = categorySearch.querySelector("select");
+
+    categorySearchInput.oninput = () => {
+        const searchText = categorySearchInput.value;
+        if (!searchText.length)
+            return categorySearchSelect.innerText = "";
+        const searchTarget = [...pagesArr.map(e=>e.title.toLowerCase()), ...Object.values(noPageMaps).map(e=>e.toLowerCase())];
+        let results = searchTarget.filter(e => e.startsWith(searchText.toLowerCase())).slice(0,100);
+        if (results.length < 100)
+            results = [...results, ...searchTarget.filter(e => e.includes(searchText.toLowerCase()) && !results.includes(e)).slice(0,100-results.length)];
+        if (results.length == 100)
+            results.push("...");
+        categorySearchSelect.innerText = "";
+        results.forEach(e => {
+            const option = document.createElement("option");
+            option.innerText = `${e.slice(0,1).toUpperCase()}${e.slice(1).toLowerCase()}`;
+            option.value = e;
+            categorySearchSelect.appendChild(option);
+        });
+    }
+
+    categorySearchSelect.oninput = () => {
+        if (!categorySearchSelect.value || categorySearchSelect.value == "...")
+            return;
+        addPickableCategory(categorySearchSelect.value, true);
+    }
+
+    //const MAX_DEPTH = 10;
+    function recursiveCategories(subCategories, categories, depth) {
+        const allCategories = new Set(categories);
+        categories.forEach(e => {
+            const cat = e?.toLowerCase?.();
+            if (!cat) return [];
+            const subs = (subCategories[cat] ?? []);
+            if (!subs.length)
+                return;
+            let cacheValue = recursiveCache.get(cat);
+            if (!cacheValue) {
+                recursiveCache.set(cat, -1);
+                cacheValue = recursiveCategories(subCategories, subs, depth + 1);
+                recursiveCache.set(cat, cacheValue);
+            } else if (cacheValue == -1) {
+                recursiveCache.set(cat, []);
+                cacheValue = recursiveCategories(subCategories, subs, depth + 1);
+                recursiveCache.set(cat, cacheValue);
+            }
+            allCategories.add(...subs);
+            allCategories.add(...cacheValue);
+        });
+        return new Set([...allCategories].map(e=>e?.toLowerCase?.()||e));
+    }
+
+    function convertCat(cat) {
+        if (cat.startsWith("p:")) {
+            cat = cat.slice(2);
+            return pagesArr.find(e=>e.id == cat)?.title ?? noPageMaps[cat] ?? cat;
+        }
+        return cat;
+    }
+
+    function updateEngagement() {
+        const sorted = Object.entries(categoryScores).filter(e => e[1]).sort((a, b) => b[1] - a[1]);
+        const top10 = sorted.slice(0, 10);
+        const bottom10 = sorted.slice(sorted.length-10);
+        document.querySelector(".stats").innerText = top10.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n") + "\n...\n" + bottom10.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
+    }
+
+    function engagePost(post, amount) {
+        post.allCategories.forEach(e => categoryScores[e] = (categoryScores[e] ?? 0) + amount);
+        return amount;
+    }
+
+    function showPic(imgName) {
+        const fullImg = document.createElement("img");
+        fullImg.src = `https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/${imgName.replace(/ /g, '_')}`;
+        fullImg.popover = "auto";
+        fullImg.classList.add("fullImg");
+        document.body.appendChild(fullImg);
+        fullImg.showPopover();
+        fullImg.ontoggle = (e) => e.newState === "open" || fullImg.remove();
+    }
+
+    function createNextPost() {
+        const nextPost = getNextPost();
+        const postDiv = document.createElement("article");
+        const postTitle = document.createElement("h1");
+        const postP = document.createElement("p");
+        const postYes = document.createElement("button");
+        postDiv.classList.add("post");
+        postDiv.onclick = () => {
+            window.open(`https://simple.wikipedia.org/wiki/${nextPost.title.replace(/ /g, '_')}`);
+            if (!postDiv.dataset.engaged)
+                postDiv.dataset.engaged = engagePost(nextPost, 75);
+        };
+        postTitle.innerText = nextPost.title;
+        postP.innerText = nextPost.text;
+        postYes.innerText = "Like";
+        postYes.onclick = (e) => {
+            postYes.dataset.liked = true;
+            if (!postYes.dataset.engaged)
+                postYes.dataset.engaged = engagePost(nextPost, 50 + postsWithoutLike*4);
+            postsWithoutLike = 0;
+            setTimeout(updateEngagement,100); 
+            e.stopPropagation();
+        };
+        postDiv.appendChild(postTitle);
+        postDiv.appendChild(postP);
+        if (nextPost.thumb) {
+            const postImg = document.createElement("img");
+            postImg.src = `https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/${nextPost.thumb.replace(/ /g, '_')}&width=512`;
+            postImg.classList.add("media");
+            postImg.loading = "eager";
+            postImg.onerror = () => postImg.remove();
+            postImg.onclick = (e) => {
+                showPic(nextPost.thumb);
+                if (!postImg.dataset.engaged)
+                    postImg.dataset.engaged = engagePost(nextPost, 100);
+                e.stopPropagation();
+            };
+            postDiv.appendChild(postImg);   
+        }
+        postDiv.appendChild(postYes);
+        //nextPost.allCategories.forEach(e => categoryScores[e] -= 1);
+        engagePost(nextPost, -5);
+        postsWithoutLike++;
+        document.querySelector(".posts").appendChild(postDiv);
+    }
+
+    function getNextPost() {
+        const potentialPosts = [...Array(10000)].map(e=>pagesArr[Math.floor(Math.random()*pagesArr.length)]).map(post => {
+            const initialScore = (post.thumb ? 5 : 0) + (3**(post.seen??0)-1)*-50000;
+            const postScore = post.allCategories.reduce((sum, cat) => sum + (categoryScores[cat]??0), initialScore);
+            // intentionally do this to the original obj instance
+            post.score = postScore;
+            return post;
+        });
+
+        let highestScore = -Infinity;
+        let bestPost = potentialPosts[0];
+
+        if (Math.random() < 0.3) {
+            const minScore = Math.min(potentialPosts.map(e=>e.score));
+            const maxScore = potentialPosts.reduce((sum, post) => sum + post.score - minScore, 0);
+            const targetScore = Math.random()*maxScore;
+            let scoreCount = 0;
+        
+            while (scoreCount < targetScore && potentialPosts.length) {
+                const potentialPost = potentialPosts.pop();
+                bestPost = potentialPost;
+                scoreCount += potentialPost.score - minScore;
+            }
+        } else if (Math.random()>0.3)
+            potentialPosts.forEach(post => {
+                if (post.score > highestScore) {
+                    bestPost = post;
+                    highestScore = post.score;
+                }
+            });
+        bestPost.seen = (bestPost.seen??0) + 1;
+        return bestPost;
+    }
+
+    function render() {
+        if (document.documentElement.scrollHeight < scrollY+innerHeight + 1500)
+            createNextPost();
+        requestAnimationFrame(render);
+    }
+
+    function addPickableCategory(cat, checked) {
+        if (document.querySelector(`.categoryPicker input[data-category="${cat.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`))
+            return;
+        const picker = document.createElement("label");
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        picker.innerText = `${cat.slice(0,1).toUpperCase()}${cat.slice(1).toLowerCase()}`;
+        picker.appendChild(check);
+        picker.classList.add("categoryPicker");
+        check.dataset.category = cat;
+        if (checked)
+            check.checked = true;
+        categoryPickList.appendChild(picker);
+    }
+
+async function* streamToAsyncIterable(stream) {
+  const reader = stream.getReader()
+  try {
+    while (true) {
+      const {done, value} = await reader.read()
+      if (done) return
+      yield value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+    async function getFileWithProgress(url) {
+        const resp = await fetch(url);
+        let responseSize = 0;
+        const bytes = new Uint8Array(DATA_SIZE);
+        for await (const chunk of streamToAsyncIterable(resp.body)) {
+            if (Math.floor(responseSize/DATA_SIZE*100) < Math.floor((responseSize+chunk.length)/DATA_SIZE*100))
+                startBtn.innerText = `Xikipedia is loading... (${Math.floor(responseSize/DATA_SIZE*100)}% of 40MB loaded)`;
+            bytes.set(chunk, responseSize);
+            responseSize += chunk.length;
+        }
+        startBtn.innerText = `Xikipedia is loading... (100% downloaded)`;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+        return JSON.parse(new TextDecoder().decode(bytes));
+    }
+
+    async function main() {
+        startScreen.showPopover();
+        defaultCategories.forEach(e=>addPickableCategory(e));
+        startBtn.innerText = "Xikipedia is loading... (downloading ~40MB of data)";
+        //const smoldata = await (await fetch("smoldata.json")).json();
+        const smoldata = await getFileWithProgress("smoldata.json");
+
+        const subCategories = smoldata.subCategories;
+        noPageMaps = smoldata.noPageMaps;
+        const tempPages = smoldata.pages.map(e => ({title:e[0],id:e[1],text:e[2],thumb:e[3],categories:e[4],links:e[5]}));
+
+        let i = 0;
+        const wikiLen = tempPages.length;
+        console.log(wikiLen);
+        const loading = document.querySelector("#loading");
+        let lastFrame = Date.now();
+        for (const tempPage of tempPages) {
+            if (i % 1000 == 0 && Date.now() - lastFrame > 20) {
+                startBtn.innerText = `Xikipedia is loading... (${(i/wikiLen*100).toFixed(0)}%)`;
+                await new Promise(e => requestAnimationFrame(e));
+            }
+            i++;
+            tempPage.allCategories = [...recursiveCategories(subCategories, [...tempPage.categories], 0), `p:${tempPage.id}`, ...tempPage.links.map(e=>`p:${e}`)];
+            pagesArr.push(tempPage);
+        }
+        loading.remove();
+        startBtn.removeAttribute("disabled");
+        categorySearchInput.removeAttribute("disabled");
+        startBtn.innerText = "I'm an adult, continue";
+        startBtn.onclick = () => {
+            startScreen.hidePopover();
+            document.querySelectorAll(".categoryPicker>input:checked").forEach(e => categoryScores[e.dataset.category] = defaultCategories.includes(e.dataset.category) ? 1000 : 5000);
+            //document.querySelectorAll(".categoryPicker>input:checked").forEach(e => engagePost(pagesArr.find(x=>x.title.toLowerCase()==e.dataset.category), 1000));
+            startScreen.remove();
+            requestAnimationFrame(render);
+        }
+    }
+
+
+    window.onload = main;
+</script>
+</body>
+</html>
