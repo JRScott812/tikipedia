@@ -433,7 +433,7 @@ async function* streamToAsyncIterable(stream) {
 }
 
     async function getFileWithProgress(url) {
-        const resp = await fetch(url);
+        const resp = await fetch(url, {cache: "force-cache"});
         let responseSize = 0;
         const bytes = new Uint8Array(DATA_SIZE);
         for await (const chunk of streamToAsyncIterable(resp.body)) {
