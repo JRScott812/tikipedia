@@ -33,3 +33,7 @@ To get the next post in the feed, 10000 random posts are picked out from the dat
 - (18% chance) A completely random post is shown.
 
 The categories `given names` and `surnames` start off with a base score of -1000 due to how prevelant they would be otherwise.
+
+## Licensing
+
+This project is licensed under AGPLv3. This license applies to the project itself, but not the included json file that contains data from Wikipedia. If you'd like to use this project, but can't use it due to its current license, let me know and I might relicense it.
