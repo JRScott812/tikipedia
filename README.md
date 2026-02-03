@@ -11,3 +11,25 @@ Xikipedia is a pseudo social media feed that algorithmically shows you content f
 
 To run Xikipedia, you need the .json file that contains the data required. This repo already has a file for the Simple Wikipedia included, but you can also make your own by replacing the files in the `process_data.py` file with your own [WikiMedia data dumps](https://dumps.wikimedia.org/).
 
+## Algorithm
+
+The algorithm used for Xikipedia is pretty simple. Each post has a set of categories, which consists of the post's Wikipedia category tree, and the pagelinks in the post. These categories have point scores assigned to them.
+
+Here are the actions and their respective scores:
+
+- Scrolling past a post: -5
+- Liking a post: 50 + 4*posts_since_last_like
+- Clicking on an article: 75
+- Clicking on an image: 100
+
+These scores are applied through the `engagePost` function in the code.
+
+Each post has a base score, which is 0 by default. If a post has an image, it gets +5 on its base score. If you've already seen a post, its base score will be `(3**(post_seen_times)-1) * -5000`.
+
+To get the next post in the feed, 10000 random posts are picked out from the data set. Then, one of three things will randomly happen:
+
+- (40% chance) The scores of all posts are summed together, and a random value is picked. It's kind of like picking a random value, except posts with higher scores have a higher likelyhood of getting picked.
+- (42% chance) The post with the highest score is shown.
+- (18% chance) A completely random post is shown.
+
+The categories `given names` and `surnames` start off with a base score of -1000 due to how prevelant they would be otherwise.
