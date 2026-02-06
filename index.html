@@ -11,6 +11,7 @@
     <meta property="og:locale" content="en-us">
     <meta property="og:type" content="website">
     <meta content="#2cafff" name="theme-color" />
+    <link rel="manifest" href="app.webmanifest" />
     <style>
         html, body {
             background: #15202B;
@@ -20,12 +21,12 @@
         body {
             display: flex;
             justify-content: center;
+            margin: 0;
         }
         .posts {
             max-width: 600px;
             width: 100vw;
-            border: 1px solid #38444D;
-            border-top: none;
+            outline: 1px solid #38444D;
             height: fit-content;
             &:has(.post) {
                 margin-bottom: 1000px;
@@ -42,7 +43,7 @@
         }
         .post {
             padding: 12px 24px;
-            border-top: 1px solid #38444D;
+            border-bottom: 1px solid #38444D;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
@@ -203,15 +204,35 @@
         a[href] {
             color: #2cafff;
         }
+        .bottomNav {
+            display: flex;
+            justify-content: space-around;
+            position: fixed;
+            bottom: 0;
+            background: #15202B;
+            border-top: 1px solid #38444D;
+            max-width: 600px;
+            width: 100vw;
+            height: 48px;
+            box-sizing: border-box;
+            padding: 8px 0;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <p id="loading">Loading...</p>
     <div class="posts"></div>
     <div class="stats"></div>
+    <nav class="bottomNav">
+        <button>settings</button>
+        <button>profiles</button>
+        <button>stats</button>
+        <button>install</button>
+    </nav>
     <div id="startScreen" popover=manual>
         <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
-        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared here, the algorithm runs locally and the data disappears once you refresh or close the tab.</p>
+        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared, the algorithm runs locally. Optionally, you can enable saving your algorithm data on your device locally.</p>
         <p style="margin-top:0">Source code on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>, discuss on <a href="https://infosec.exchange/@rebane2001/115998023365214091">fedi</a>, <a href="https://bsky.app/profile/rebane2001.bsky.social/post/3mdtj5cc7pk2b">bluesky</a>, or <a href="https://twitter.com/rebane2001/status/2018107789512474738">twitter</a>.</p>
         <p style="margin-top:0;display:none" id="iosmessage">Note to iOS users: Apple arbitrarily limits the amount of memory a site can use, which means it's possible this site will crash before the loading finishes. I have no way to test for this myself as my iPhone does not do that. If this happens to you, try opening the site in desktop mode and see if that helps. If it still crashes, you'll just have to use this site from a different device. Blame Apple for creating undebuggable web platform issues while not letting you use an alternative browser engine on a device you supposedly own.</p>
         <p style="font-weight: 600;margin:0">Pick some categories to get started (optional)</p>
@@ -224,7 +245,43 @@
         </div>
         <p style="margin-top:auto">Since the content and images shown is from random Wikipedia articles, you will likely see NSFW content. Please only continue if you're an adult.</p>
         <button id="startBtn" disabled>I'm an adult, continue</button>
+        <button id="install">Install</button>
+        <script>
+
+        </script>
     </div>
+<script type="text/javascript">
+    /* PWA stuff */
+    let installPrompt = null;
+    const installButton = document.querySelector("#install");
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      installPrompt = event;
+      installButton.removeAttribute("hidden");
+    });
+    installButton.addEventListener("click", async () => {
+      if (!installPrompt) {
+        return;
+      }
+      const result = await installPrompt.prompt();
+      console.log(`Install prompt was: ${result.outcome}`);
+      disableInAppInstallPrompt();
+    });
+    
+    function disableInAppInstallPrompt() {
+      installPrompt = null;
+      installButton.setAttribute("hidden", "");
+    }
+
+    window.swReg = null;
+    if ("serviceWorker" in navigator)
+        navigator.serviceWorker.register("/sw.js").then(reg => window.swReg = reg).catch(err => {
+            window.swReg = "err";
+            console.error(`Registration failed with ${err}`);
+        });
+    else
+        window.swReg = "err";
+</script>
 <script type="text/javascript">
     const pagesArr = [];
     let noPageMaps = {};
@@ -235,7 +292,27 @@
     };
     const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
     let postsWithoutLike = 0;
-    const DATA_SIZE = 225690064;
+
+    const HTML_VERSION = "1.0.0";
+
+    function loadSettings() {
+        const baseSettings = {
+            storeData: false,
+            openMainWiki: true,
+            dataSize: 225690064,
+        };
+        const loadedSettings = JSON.parse(localStorage.getItem("xikipedia-settings") ?? '{}');
+        return Object.assign(baseSettings, loadedSettings);
+    }
+
+    function saveSettings(settings) {
+        localStorage.setItem("xikipedia-settings", JSON.stringify(settings));
+    }
+
+    const settings = loadSettings();
+
+    const DATA_SIZE = settings.dataSize;
+    const DATA_URL = `smoldata.json?${DATA_SIZE}`;
 
     const startBtn = document.getElementById("startBtn");
     const categoryPickList = document.getElementById("categoryPickList");
@@ -454,14 +531,46 @@ async function* streamToAsyncIterable(stream) {
         return JSON.parse(new TextDecoder().decode(bytes));
     }
 
+    async function checkVersionAsync() {
+        try {
+            const versionInfo = await (await fetch("version.json", {cache: "no-store"})).json();
+            if (versionInfo.html != HTML_VERSION) {
+                if (window.swReg) {
+                    const res = await (await fetch("/clearHtml")).text();
+                    console.log(res);
+                }
+                document.location.reload();
+                // || versionInfo.sw != settings.swVer
+            }
+            if (window.swReg) {
+                const swVer = await (await fetch("/swVer")).text();
+                if (versionInfo.sw != swVer) {
+                    await window.swReg.update();
+                    document.location.reload();
+                }
+            }
+            if (settings.dataSize != versionInfo.simple) {
+                // todo: handle updating data but only upon user request
+            }
+        } catch (e) {
+            console.error("Couldn't check versions", e);
+        }
+    }
+
     async function main() {
         if (/iPad|iPhone|iPod/.test(navigator.userAgent))
             document.getElementById("iosmessage").style.display = "block";
         startScreen.showPopover();
         defaultCategories.forEach(e=>addPickableCategory(e));
+        startBtn.innerText = "Xikipedia is loading... (waiting 5s for service worker)";
+        for (let i = 0; i<500; i++) {
+            if (window.swReg && (swReg == "err" || window.swReg?.active)) break;
+            await new Promise(r => setTimeout(r, 10));
+        }
+        checkVersionAsync();
         startBtn.innerText = "Xikipedia is loading... (downloading ~40MB of data)";
         //const smoldata = await (await fetch("smoldata.json")).json();
-        const smoldata = await getFileWithProgress("smoldata.json");
+        const smoldata = await getFileWithProgress(DATA_URL);
 
         const subCategories = smoldata.subCategories;
         noPageMaps = smoldata.noPageMaps;
