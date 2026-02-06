@@ -447,7 +447,7 @@
                 }
                 &:has(input:focus-visible) {
                     &::before {
-                        outline: 2px solid #000;
+                        outline: 2px solid light-dark(#000, #FFF);
                     }
                 }
                 input {
@@ -478,6 +478,48 @@
                     background: red;
                     color: #FFF;
                 }
+                &.btn-danger-outline {
+                    background: #0000;
+                    color: var(--fg);
+                    border: 2px solid red;
+                    box-sizing: border-box;
+                }
+            }
+            profile-entry {
+                padding: 8px;
+                padding-left: 20px;
+                border-radius: 32px;
+                border: 1px solid var(--border);
+                display:flex;
+                justify-content:space-between;
+                align-items: center;
+                margin-top: 8px;
+                cursor: pointer;
+                background: light-dark(#0000, #FFF0);
+                transition: background 0.1s;
+                button {
+                    cursor: pointer;
+                    background: #F000;
+                    color: red;
+                    font-weight: 600;
+                    border: none;
+                    transition: background 0.1s, color 0.1s;
+                    &:hover, &:active, &:focus {
+                        background: #F00;
+                        color: #FFF;
+                    }
+                }
+                &:hover, &:active, &:focus {
+                    background: light-dark(#0002, #FFF2);
+                }
+                &.current {
+                    font-weight: 600;
+                    border-color: var(--theme);
+                }
+            }
+            #profilesList > button {
+                width:100%;
+                margin-top:8px;
             }
         }
         #statsModal {
@@ -526,6 +568,8 @@
     </div>
     <dialog class="modal" id="profilesModal" closedby=any>
         <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Profiles</h2><button class="closeButton" aria-label="Close" onclick=profilesModal.close()>X</button></div>
+        <p id="storeDataWarning">Warning! You have disabled the "Store data" setting in settings, no data will get saved to your profiles until you turn the setting back on.</p>
+        <div id="profilesList"></div>
     </dialog>
     <dialog class="modal" id="statsModal" closedby=any>
         <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Statistics</h2><button class="closeButton" aria-label="Close" onclick=statsModal.close()>X</button></div>
@@ -548,6 +592,7 @@
         </radio-picker>
         </pseudo-label>
         <div style="flex:1"></div>
+        <button class="btn-danger-outline" onclick=resetAlgorithm() style="margin-bottom:8px">Reset the algorithm</button>
         <button class="btn-danger" onclick=resetEverything()>Delete all data</button>
     </dialog>
 <script type="text/javascript">
@@ -597,7 +642,6 @@
     let timeSpentSession = 0;
     let timeSpentTotal = 0;
     let profileName = "Default";
-    let currentProfileId = "default";
 
     let lastSpentTime = Date.now();
 
@@ -623,11 +667,19 @@
         return computedSettings;
     }
 
-    function saveSettings(settings) {
+    function saveSettings() {
         settings.theme = document.querySelector('[name=theme]:checked')?.id ?? "theme-auto";
         settings.storeData = document.getElementById("setting-storeData").checked;
         settings.openMainWiki = document.getElementById("setting-openMainWiki").checked;
         localStorage.setItem("xikipedia-settings", JSON.stringify(settings));
+    }
+
+    function resetAlgorithm() {
+        if (!confirm(`Reset the algorithm and statistics in profile "${profileName}"?`))
+            return;
+        localStorage.removeItem(`xikipedia-profile-${settings.profile}`);
+        loadProfile(settings.profile);
+        document.location.reload();
     }
 
     function resetEverything(autoConfirm) {
@@ -655,6 +707,9 @@
     const profilesModal = document.getElementById("profilesModal");
     const statsModal = document.getElementById("statsModal");
     const settingsModal = document.getElementById("settingsModal");
+
+    const profilesList = document.getElementById("profilesList");
+    const storeDataWarning = document.getElementById("storeDataWarning");
 
     settingsModal.querySelectorAll("input").forEach(e => e.onchange = saveSettings);
 
@@ -684,6 +739,8 @@
     }
 
     function initProfile() {
+        if (!settings.storeData)
+            return false;
         if (!settings.profiles.length)
             settings.profiles.push("default");
         if (!settings.profiles.includes(settings.profile))
@@ -692,7 +749,7 @@
     }
 
     function loadProfile(profileId) {
-        currentProfileId = profileId;
+        settings.profile = profileId;
         const defaultProfile = {
             profileName: "Default",
             categoryScores: {
@@ -721,10 +778,14 @@
         window.scrollTo(0, 0);
         document.querySelector(".posts").innerText = "";
         likesLen = likedPosts.length;
-        return !!likedPosts.length;
+        saveSettings();
+        saveProfile();
+        return !!seenPosts.length;
     }
 
     function saveProfile() {
+        if (!settings.storeData)
+            return;
         const profile = {
             profileName,
             categoryScores,
@@ -732,25 +793,75 @@
             likedPosts,
             timeSpentTotal,
         }
-        localStorage.setItem(`xikipedia-profile-${currentProfileId}`, JSON.stringify(profile));
+        localStorage.setItem(`xikipedia-profile-${settings.profile}`, JSON.stringify(profile));
     }
 
     function addProfile(newProfileName) {
         const profileId = Math.random().toString(36).slice(2);
         localStorage.setItem(`xikipedia-profile-${profileId}`, JSON.stringify({profileName:newProfileName}));
+        settings.profiles.push(profileId);
         loadProfile(profileId);
+        document.location.reload();
     }
 
     function deleteProfile(profileId, skipInit) {
         localStorage.removeItem(`xikipedia-profile-${profileId}`);
         settings.profiles = settings.profiles.filter(e => e != profileId);
-        if (profileId != currentProfileId || skipInit)
+        if (profileId != settings.profile || skipInit)
             return;
         initProfile();
     }
 
     function showProfilesModal() {
         profilesModal.showModal();
+        storeDataWarning.style.display = settings.storeData ? "none" : "block";
+        profilesList.innerText = "";
+        settings.profiles.forEach(profileId => {
+            const profileName = JSON.parse(localStorage.getItem(`xikipedia-profile-${profileId}`) ?? "{}")?.profileName || profileId;
+            const isCurrentProfile = profileId == settings.profile;
+            const profileEntry = document.createElement("profile-entry");
+            const deleteButton = document.createElement("button");
+            profileEntry.innerText = profileName;
+            if (isCurrentProfile)
+                profileEntry.classList.add("current");
+            profileEntry.setAttribute("tabindex", "0");
+            profileEntry.setAttribute("role", "button");
+            const loadThisProfile = e => {
+                settings.profile = profileId;
+                loadProfile(profileId);
+                //document.querySelectorAll("profile-entry.current").forEach(x=>x.classList.remove("current"));
+                //profileEntry.classList.add("current");
+                profilesModal.close();
+                showProfilesModal();
+            };
+            profileEntry.onclick = loadThisProfile;
+            profileEntry.onkeydown = e => (e.keyCode == 13 || e.keyCode == 32) ? loadThisProfile(e) : true;
+            deleteButton.innerText = "Delete";
+            const deleteThisProfile = e => {
+                e.stopPropagation();
+                if (confirm(`Delete profile ${profileName}?`)) {
+                    deleteProfile(profileId);
+                    // profileEntry.remove();
+                    profilesModal.close();
+                    showProfilesModal();
+                }
+            };
+            deleteButton.onclick = deleteThisProfile;
+            deleteButton.onkeydown = e => (e.keyCode == 13 || e.keyCode == 32) ? deleteThisProfile(e) : true;
+            profileEntry.appendChild(deleteButton);
+            profilesList.appendChild(profileEntry);
+        });
+        const addProfileButton = document.createElement("button");
+        addProfileButton.innerText = "Add profile";
+        addProfileButton.onclick = () => {
+            const profileName = prompt("Profile name");
+            if (profileName && profileName.length) {
+                addProfile(profileName);
+                profilesModal.close();
+                showProfilesModal();
+            }
+        }
+        profilesList.appendChild(addProfileButton);
     }
 
     function textTime(ms) {

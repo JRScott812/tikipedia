@@ -38,3 +38,5 @@ The categories `given names` and `surnames` start off with a base score of -1000
 
 - Handle back button on phones.
 - Maybe an iframe view that doesn't open a new tab.
+- Renaming profiles.
+- Reset algorithm without resetting time statistics.
