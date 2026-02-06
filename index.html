@@ -1075,7 +1075,7 @@
         let bestPost = potentialPosts[0];
 
         if (Math.random() < 0.4) {
-            const minScore = Math.min(potentialPosts.map(e=>e.score));
+            const minScore = Math.min(...potentialPosts.map(e => e.score));
             const maxScore = potentialPosts.reduce((sum, post) => sum + post.score - minScore, 0);
             const targetScore = Math.random()*maxScore;
             let scoreCount = 0;
