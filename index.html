@@ -227,42 +227,67 @@
                 cursor: pointer;
                 text-align: left;
                 padding: 0;
+                transition: background 0.2s;
+                border-radius: 64px;
                 &::before {
                     display: inline-block;
                     content: attr(data-icon);
                     font-size: 1rem;
                     text-align: center;
+                    width: 24px;
+                    height: 24px;
+                }
+                &[data-icon="⚙️"]::before { content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="fill:none;stroke:%23fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2px"><polyline points="13.44 5.46 14.29 2.71 18.36 2.71 19.25 5.46 21.64 6.74"/><polyline points="21.64 6.74 24.19 5.39 27.07 8.27 25.75 10.85 26.54 13.44"/><polyline points="26.54 13.44 29.29 14.29 29.29 18.36 26.54 19.25 25.26 21.64"/><polyline points="25.26 21.64 26.61 24.19 23.73 27.07 21.15 25.75 18.56 26.54"/><polyline points="18.56 26.54 17.71 29.29 13.64 29.29 12.75 26.54 10.36 25.26"/><polyline points="10.36 25.26 7.81 26.61 4.93 23.73 6.25 21.15 5.46 18.56"/><polyline points="5.46 18.56 2.71 17.71 2.71 13.64 5.46 12.75 6.74 10.36"/><polyline points="6.74 10.36 5.39 7.81 8.27 4.93 10.85 6.25 13.44 5.46"/><polyline points="13.44 5.46 14.29 2.71 18.36 2.71 19.25 5.46 21.64 6.74"/><circle cx="16" cy="16" r="6" /></svg>') / "Settings" }
+                &[data-icon="🙎🏻‍♂️"]::before { content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="fill:none;stroke:%23fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2px"><circle cx="16" cy="10.34" r="7.14"/><path d="m15.87,28.8h12.77c-.36-5.39-1.18-7.54-4.22-9.98-.28-.23-.69-.23-.97,0-1.08.84-3.9,2.52-7.31,2.52h-.28c-3.41,0-6.24-1.68-7.31-2.52-.29-.22-.69-.22-.97,0-3.04,2.44-3.86,4.59-4.22,9.98h12.77s-.26,0-.26,0Z"/></svg>') / "Profiles" }
+                &[data-icon="📊"]::before { content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="fill:none;stroke:%23fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2px"><rect x="13" y="17.75" width="6" height="12" rx="1" ry="1"/><rect x="22.5" y="3.75" width="6" height="26" rx="1" ry="1"/><rect x="3.5" y="10.75" width="6" height="19" rx="1" ry="1"/></svg>') / "Stats" }
+                &[data-icon="⬇️"]::before { content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" style="fill:none;stroke:%23fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2px"><path d="m16,4.44h2.11c1.1,0,2,.9,2,2v12.78h4.34c.45,0,.67.54.36.86l-8.36,8.37c-.25.25-.66.25-.91,0l-8.36-8.37c-.32-.32-.09-.86.36-.86h4.34V6.44c0-1.1.9-2,2-2h2.11Z"/></svg>') / "Download" }
+                &:hover {
+                    background: #FFF2;
                 }
             }
-            .logo {
+            a:has(.logo) {
                 display: none;
             }
             @media (width >= 800px) {
-                gap: 16px;
+                gap: 12px;
                 border-top: none;
                 bottom: unset;
                 top: 16px;
                 left: calc(50vw - 320px);
                 flex-direction: column;
+                align-items: flex-start;
+                justify-content: flex-start;
                 width: fit-content;
                 translate: -100% 0;
                 height: 200px;
-                justify-content: flex-start;
+                a:has(.logo) {
+                    display: block;
+                }
                 .logo {
+                    margin-left: 4px;
                     display: block;
                     image-rendering: pixelated;
                     width: 32px;
                 }
+                button:not(.hidden) {
+                    padding: 8px 4px 8px 4px;
+                    display: flex;
+                    align-items: center;
+                }
                 button::before {
-                    width: 32px;
-                    height: 32px;
-                    margin-right: 8px;
+                    width: 24px;
+                    height: 24px;
+                    translate: 0 -1px;
                 }
             }
             @media (width >= 960px) {
                 left: calc(50vw - 360px);
-                button {
+                button:not(.hidden) {
+                    padding: 8px 12px 8px 4px;
                     font-size: 1rem;
+                }
+                button::before {
+                    margin: 0 12px 0 4px;
                 }
             }
         }
@@ -273,7 +298,7 @@
     <div class="posts"></div>
     <div class="stats"></div>
     <nav class="bottomNav">
-        <img src="/favicon.ico" class="logo" />
+        <a href="https://xikipedia.org"><img src="/favicon.ico" class="logo" /></a>
         <button data-icon="⚙️">Settings</button>
         <button data-icon="🙎🏻‍♂️">Profiles</button>
         <button data-icon="📊">Stats</button>
@@ -319,12 +344,13 @@
     }
 
     window.swReg = null;
+    /*
     if ("serviceWorker" in navigator)
         navigator.serviceWorker.register("/sw.js").then(reg => window.swReg = reg).catch(err => {
             window.swReg = "err";
             console.error(`Registration failed with ${err}`);
         });
-    else
+    else*/
         window.swReg = "err";
 </script>
 <script type="text/javascript">
