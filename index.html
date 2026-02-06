@@ -216,7 +216,55 @@
             height: 48px;
             box-sizing: border-box;
             padding: 8px 0;
-            display: none;
+            button {
+                font-size: 0;
+                &.hidden {
+                    display: none;
+                }
+                border: none;
+                background: none;
+                color: #FFF;
+                cursor: pointer;
+                text-align: left;
+                padding: 0;
+                &::before {
+                    display: inline-block;
+                    content: attr(data-icon);
+                    font-size: 1rem;
+                    text-align: center;
+                }
+            }
+            .logo {
+                display: none;
+            }
+            @media (width >= 800px) {
+                gap: 16px;
+                border-top: none;
+                bottom: unset;
+                top: 16px;
+                left: calc(50vw - 320px);
+                flex-direction: column;
+                width: fit-content;
+                translate: -100% 0;
+                height: 200px;
+                justify-content: flex-start;
+                .logo {
+                    display: block;
+                    image-rendering: pixelated;
+                    width: 32px;
+                }
+                button::before {
+                    width: 32px;
+                    height: 32px;
+                    margin-right: 8px;
+                }
+            }
+            @media (width >= 960px) {
+                left: calc(50vw - 360px);
+                button {
+                    font-size: 1rem;
+                }
+            }
         }
     </style>
 </head>
@@ -225,10 +273,11 @@
     <div class="posts"></div>
     <div class="stats"></div>
     <nav class="bottomNav">
-        <button>settings</button>
-        <button>profiles</button>
-        <button>stats</button>
-        <button>install</button>
+        <img src="/favicon.ico" class="logo" />
+        <button data-icon="⚙️">Settings</button>
+        <button data-icon="🙎🏻‍♂️">Profiles</button>
+        <button data-icon="📊">Stats</button>
+        <button data-icon="⬇️" id="install" class="hidden">Install</button>
     </nav>
     <div id="startScreen" popover=manual>
         <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
@@ -245,10 +294,6 @@
         </div>
         <p style="margin-top:auto">Since the content and images shown is from random Wikipedia articles, you will likely see NSFW content. Please only continue if you're an adult.</p>
         <button id="startBtn" disabled>I'm an adult, continue</button>
-        <button id="install">Install</button>
-        <script>
-
-        </script>
     </div>
 <script type="text/javascript">
     /* PWA stuff */
@@ -257,7 +302,7 @@
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
       installPrompt = event;
-      installButton.removeAttribute("hidden");
+      installButton.classList.remove("hidden");
     });
     installButton.addEventListener("click", async () => {
       if (!installPrompt) {
@@ -270,7 +315,7 @@
     
     function disableInAppInstallPrompt() {
       installPrompt = null;
-      installButton.setAttribute("hidden", "");
+      installButton.classList.add("hidden");
     }
 
     window.swReg = null;
