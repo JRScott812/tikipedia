@@ -18,6 +18,8 @@
             --fg: light-dark(#000, #FFF);
             --border: #38444D;
             --theme: #2cafff;
+            --safe-bottom: 0px;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
             color-scheme: light dark;
             @media (prefers-color-scheme: light) {
                 &:has(#theme-auto:checked) {
@@ -244,6 +246,7 @@
             height: 48px;
             box-sizing: border-box;
             padding: 8px 0;
+            padding-bottom: calc(8px + var(--safe-bottom));
             button {
                 font-size: 0;
                 &.hidden {
@@ -638,6 +641,8 @@
       if (!installPrompt) {
         return installButton.classList.add("hidden");
       }
+      // make sure index is always cached
+      await (await fetch("/")).text();
       const result = await installPrompt.prompt();
       console.log(`Install prompt was: ${result.outcome}`);
       disableInAppInstallPrompt();
@@ -677,7 +682,7 @@
     const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
     let postsWithoutLike = 0;
 
-    const HTML_VERSION = "1.1.0";
+    const HTML_VERSION = "1.1.1";
 
     function loadSettings() {
         const baseSettings = {
