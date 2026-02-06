@@ -654,13 +654,18 @@
     }
 
     window.swReg = null;
-    if ("serviceWorker" in navigator)
+    if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/sw.js").then(reg => window.swReg = reg).catch(err => {
             window.swReg = "err";
             console.error(`Registration failed with ${err}`);
         });
-    else
+        navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data.event=="downloadProgress")
+                updateProgress(event.data.data);
+        })
+    } else {
         window.swReg = "err";
+    }
 </script>
 <script type="text/javascript">
     const pagesArr = [];
@@ -682,7 +687,7 @@
     const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
     let postsWithoutLike = 0;
 
-    const HTML_VERSION = "1.1.1";
+    const HTML_VERSION = "1.1.3";
 
     function loadSettings() {
         const baseSettings = {
@@ -1140,6 +1145,14 @@ async function* streamToAsyncIterable(stream) {
   }
 }
 
+    let lastBytesProgress = 0;
+    function updateProgress(bytesProgress) {
+        if (Math.floor(lastBytesProgress/DATA_SIZE*100) < Math.floor(bytesProgress/DATA_SIZE*100)) {
+            loadStatus(`${Math.floor(bytesProgress/DATA_SIZE*100)}% of 34MB loaded`)
+            lastBytesProgress = bytesProgress;
+        }
+    }
+
     async function getFileWithProgress(url) {
         const resp = await fetch(url, {cache: "force-cache"});
         let responseSize = 0;
@@ -1188,6 +1201,7 @@ async function* streamToAsyncIterable(stream) {
             loading.innerText = `Loading...\n(${text})`;
     }
 
+    let downloadFinished = false;
     async function main() {
         if (/iPad|iPhone|iPod/.test(navigator.userAgent))
             document.getElementById("iosmessage").style.display = "block";
@@ -1206,8 +1220,10 @@ async function* streamToAsyncIterable(stream) {
         }
         checkVersionAsync();
         loadStatus("loading data");
+        setTimeout(()=>downloadFinished||loadStatus("this might take a minute on some connections"),5000)
         //const smoldata = await (await fetch("smoldata.json")).json();
         const smoldata = await getFileWithProgress(DATA_URL);
+        downloadFinished = true;
 
         const subCategories = smoldata.subCategories;
         noPageMaps = smoldata.noPageMaps;
