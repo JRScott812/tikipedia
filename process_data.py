@@ -1,6 +1,5 @@
 import json, xmltodict
 import mwparserfromhell
-from pprint import pprint
 import gzip
 import bz2
 import re

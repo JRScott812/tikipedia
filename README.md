@@ -36,6 +36,7 @@ To get the next post in the feed, 10000 random posts are picked out from the dat
 
 The categories `given names` and `surnames` start off with a base score of -1000 due to how prevelant they would be otherwise.
 
+<<<<<<< HEAD
 ## TODO
 
 - Handle back button on phones.
@@ -71,3 +72,8 @@ Loose changelog, check the commit history for more detail.
 ### 2026-02-02
 
 - Initial release
+=======
+## Licensing
+
+This project is licensed under AGPLv3. This license applies to the project itself, but not the included json file that contains data from Wikipedia. If you'd like to use this project, but can't use it due to its current license, let me know and I might relicense it.
+>>>>>>> a994d7f320e728d9e7ce5078d2d7ebae8c207e6f
