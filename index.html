@@ -456,14 +456,16 @@
                     pointer-events: none;
                 }
             }
-            .closeButton {
+            button.closeButton {
                 background: #0000;
                 color: var(--fg);
                 border: none;
                 cursor: pointer;
                 font-size: 1.2rem;
+                font-weight: normal;
             }
             button {
+                font-weight: 500;
                 cursor: pointer;
                 border: none;
                 background: var(--theme);
@@ -475,6 +477,22 @@
                 &.btn-danger {
                     background: red;
                     color: #FFF;
+                }
+            }
+        }
+        #statsModal {
+            details {
+                padding: 8px;
+                border-radius: 8px;
+                margin: 4px 0;
+                border: 1px solid var(--border);
+                summary {
+                    cursor: pointer;
+                }
+                .likedPostEntry {
+                    display: block;
+                    margin: 0;
+                    width: fit-content;
                 }
             }
         }
@@ -490,7 +508,6 @@
         <button data-icon="⬇️" id="install" class="hidden">Install</button>
     </nav>
     <div class="posts"></div>
-    <div class="stats"></div>
     <div id="startScreen" popover=manual>
         <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
         <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared, the algorithm runs locally. Optionally, you can enable saving your algorithm data on your device locally.</p>
@@ -512,6 +529,10 @@
     </dialog>
     <dialog class="modal" id="statsModal" closedby=any>
         <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Statistics</h2><button class="closeButton" aria-label="Close" onclick=statsModal.close()>X</button></div>
+        <p id="generalStats"></p>
+        <details ontoggle=updateTopStats()><summary>Top categories</summary><div id="top100"></div></details>
+        <details ontoggle=updateTopStats()><summary>Bottom categories</summary><div id="bottom100"></div></details>
+        <details ontoggle=updateLikeStats()><summary>Liked posts</summary><div id="likedPosts"></div></details>
     </dialog>
     <dialog class="modal" id="settingsModal" closedby=any>
         <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Settings</h2><button class="closeButton" aria-label="Close" onclick=settingsModal.close()>X</button></div>
@@ -572,6 +593,7 @@
     };
     let seenPosts = [];
     let likedPosts = [];
+    let likesLen = 0;
     let timeSpentSession = 0;
     let timeSpentTotal = 0;
     let profileName = "Default";
@@ -698,6 +720,7 @@
         } catch {}
         window.scrollTo(0, 0);
         document.querySelector(".posts").innerText = "";
+        likesLen = likedPosts.length;
         return !!likedPosts.length;
     }
 
@@ -730,8 +753,60 @@
         profilesModal.showModal();
     }
 
+    function textTime(ms) {
+        const h = Math.floor(ms/1000/3600);
+        const m = Math.floor((ms/1000/60) % 60);
+        const s = Math.floor((ms/1000) % 60);
+        let timeText = `${s} second${s==1?'':'s'}`;
+        if (m || h) {
+            timeText = `${m} minute${m==1?'':'s'}`;
+        }
+        if (h) {
+            timeText = `${h} hour${h==1?'':'s'}, ${m} minute${m==1?'':'s'}`;
+        }
+        return timeText;
+    }
+
+    let topStatsStale = false;
+    let likeStatsStale = false;
+
+    function updateTopStats() {
+        if (!topStatsStale)
+            return;
+        topStatsStale = false;
+        const sorted = Object.entries(categoryScores).filter(e => e[1]).sort((a, b) => b[1] - a[1]);
+        const top100 = sorted.slice(0, 100);
+        const bottom100 = sorted.slice(sorted.length-100);
+        document.getElementById("top100").innerText = top100.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
+        document.getElementById("bottom100").innerText = bottom100.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
+    }
+
+    function updateLikeStats() {
+        if (!likeStatsStale)
+            return;
+        likeStatsStale = false;
+        const likedPostsEl = document.getElementById("likedPosts");
+        likedPostsEl.innerText = "";
+        likedPosts.forEach(postId => {
+            const post = pagesArr.find(e=>e.id==postId);
+            const link = document.createElement(post ? "a" : "em");
+            link.classList.add("likedPostEntry");
+            if (post) {
+                link.innerText = post.title;
+                link.href = getArticleLink(post.title);
+            } else {
+                link.innerText = `Unknown post (id: ${postId})`;
+            }
+            likedPostsEl.appendChild(link);
+        });
+    }
+
     function showStatsModal() {
         statsModal.showModal();
+        topStatsStale = true;
+        likeStatsStale = true;
+        document.getElementById("generalStats").innerText = `Posts scrolled (total): ${seenPosts.length}\nPosts scrolled (session): ${seenPosts.length - likesLen}\nTime spent (total): ${textTime(timeSpentTotal)}\nTime spent (session): ${textTime(timeSpentSession)}`;
+        document.querySelectorAll("#statsModal details").forEach(e => e.open = false);
     }
 
     function showSettingsModal() {
@@ -771,13 +846,6 @@
         return cat;
     }
 
-    function updateEngagement() {
-        const sorted = Object.entries(categoryScores).filter(e => e[1]).sort((a, b) => b[1] - a[1]);
-        const top10 = sorted.slice(0, 10);
-        const bottom10 = sorted.slice(sorted.length-10);
-        document.querySelector(".stats").innerText = top10.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n") + "\n...\n" + bottom10.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
-    }
-
     function engagePost(post, amount) {
         post.allCategories.forEach(e => categoryScores[e] = (categoryScores[e] ?? 0) + amount);
         return amount;
@@ -794,6 +862,10 @@
         fullImg.onclick = fullImg.hidePopover();
     }
 
+    function getArticleLink(articleTitle) {
+        return `https://${settings.openMainWiki ? 'en' : 'simple'}.wikipedia.org/wiki/${articleTitle.replace(/ /g, '_')}`;
+    }
+
     function createNextPost() {
         const nextPost = getNextPost();
         const postDiv = document.createElement("article");
@@ -802,7 +874,7 @@
         const postYes = document.createElement("button");
         postDiv.classList.add("post");
         postDiv.onclick = () => {
-            window.open(`https://simple.wikipedia.org/wiki/${nextPost.title.replace(/ /g, '_')}`);
+            window.open(getArticleLink(nextPost.title));
             if (!postDiv.dataset.engaged)
                 postDiv.dataset.engaged = engagePost(nextPost, 75);
         };
@@ -818,7 +890,6 @@
                 postYes.dataset.engaged = engagePost(nextPost, 50 + postsWithoutLike*4);
             postsWithoutLike = 0;
             setTimeout(saveProfile,100); 
-            //setTimeout(updateEngagement,100); 
             e.stopPropagation();
         };
         postDiv.appendChild(postTitle);

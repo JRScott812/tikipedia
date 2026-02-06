@@ -33,3 +33,8 @@ To get the next post in the feed, 10000 random posts are picked out from the dat
 - (18% chance) A completely random post is shown.
 
 The categories `given names` and `surnames` start off with a base score of -1000 due to how prevelant they would be otherwise.
+
+## TODO
+
+- Handle back button on phones.
+- Maybe an iframe view that doesn't open a new tab.
