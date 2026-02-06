@@ -5,7 +5,9 @@ Wikipedia as a social media feed
 
 ## About
 
-Xikipedia is a pseudo social media feed that algorithmically shows you content from [Simple Wikipedia](https://simple.wikipedia.org/). It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared here, the algorithm runs locally and the data disappears once you refresh or close the tab.
+Xikipedia is a pseudo social media feed that algorithmically shows you content from [Simple Wikipedia](https://simple.wikipedia.org/). It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.
+
+Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.
 
 ## Generating data
 
@@ -40,3 +42,32 @@ The categories `given names` and `surnames` start off with a base score of -1000
 - Maybe an iframe view that doesn't open a new tab.
 - Renaming profiles.
 - Reset algorithm without resetting time statistics.
+- Handle updating the dataset in settings or something.
+- Export/import profiles (algorithm data).
+
+## Changelog
+
+Loose changelog, check the commit history for more detail.
+
+### 2026-02-06
+
+- Now available as an app (PWA)!
+- Fully available offline through Service Workers
+- Algorithm data persistence (optional)
+- Navbar and its icons (made by yours truly)
+- Settings menu
+- Light theme
+- Ability to choose between English and Simple Wikipedias for links
+- Profiles, profile management
+- Statistics
+- About
+
+### 2026-02-03
+
+- More info in README
+- Added algorithm script to repo
+- Added iOS warning to start screen
+
+### 2026-02-02
+
+- Initial release

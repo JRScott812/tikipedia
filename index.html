@@ -254,7 +254,7 @@
                 color: var(--fg);
                 cursor: pointer;
                 text-align: left;
-                padding: 0;
+                padding: 0 3px;
                 transition: background 0.2s;
                 border-radius: 64px;
                 &::before {
@@ -396,7 +396,7 @@
             border-radius: 8px;
             padding: 32px;
             box-sizing: border-box;
-            h1,h2,p {
+            h1,h2,h3,p {
                 margin: 0;
             }
             p {
@@ -414,9 +414,12 @@
             }
             &>label:has(input[type="checkbox"]) {
                 position: relative;
+                padding-right: 58px;
                 &::before {
                     position: absolute;
-                    inset: 0;
+                    top: 0;
+                    right: 0;
+                    height: 26px;
                     left: initial;
                     content: "";
                     transition: background 0.2s;
@@ -427,8 +430,9 @@
                 }
                 &::after {
                     position: absolute;
-                    inset: 2px;
-                    left: initial;
+                    top: 2px;
+                    right: 2px;
+                    height: 22px;
                     content: "";
                     background: #FFF;
                     border-radius: 32px;
@@ -482,6 +486,12 @@
                     background: #0000;
                     color: var(--fg);
                     border: 2px solid red;
+                    box-sizing: border-box;
+                }
+                &.btn-outline {
+                    background: #0000;
+                    color: var(--fg);
+                    border: 2px solid var(--theme);
                     box-sizing: border-box;
                 }
             }
@@ -552,7 +562,8 @@
     <div class="posts"></div>
     <div id="startScreen" popover=manual>
         <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
-        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. No data is collected or shared, the algorithm runs locally. Optionally, you can enable saving your algorithm data on your device locally.</p>
+        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.</p>
+        <p style="margin-top:0">Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.</p>
         <p style="margin-top:0">Source code on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>, discuss on <a href="https://infosec.exchange/@rebane2001/115998023365214091">fedi</a>, <a href="https://bsky.app/profile/rebane2001.bsky.social/post/3mdtj5cc7pk2b">bluesky</a>, or <a href="https://twitter.com/rebane2001/status/2018107789512474738">twitter</a>.</p>
         <p style="margin-top:0;display:none" id="iosmessage">Note to iOS users: Apple arbitrarily limits the amount of memory a site can use, which means it's possible this site will crash before the loading finishes. I have no way to test for this myself as my iPhone does not do that. If this happens to you, try opening the site in desktop mode and see if that helps. If it still crashes, you'll just have to use this site from a different device. Blame Apple for creating undebuggable web platform issues while not letting you use an alternative browser engine on a device you supposedly own.</p>
         <p style="font-weight: 600;margin:0">Pick some categories to get started (optional)</p>
@@ -592,13 +603,32 @@
         </radio-picker>
         </pseudo-label>
         <div style="flex:1"></div>
+        <button class="btn-outline" onclick=showAboutModal() style="margin-bottom:8px">About Xikipedia</button>
         <button class="btn-danger-outline" onclick=resetAlgorithm() style="margin-bottom:8px">Reset the algorithm</button>
         <button class="btn-danger" onclick=resetEverything()>Delete all data</button>
+    </dialog>
+    <dialog class="modal" id="aboutModal" closedby=any>
+        <!-- TODO: do not dupe the text manually here -->
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>About Xikipedia</h2><button class="closeButton" aria-label="Close" onclick=aboutModal.close()>X</button></div>
+        <h3 style="font-size: 100%;opacity:0.85;font-style:italic;margin-bottom:16px">A project by <a href="https://lyra.horse">rebane2001</a></h3>
+        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.</p><br>
+        <p style="margin-top:0">Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.</p><br>
+        <p style="margin-top:0">Source code on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>, discuss on <a href="https://infosec.exchange/@rebane2001/115998023365214091">fedi</a>, <a href="https://bsky.app/profile/rebane2001.bsky.social/post/3mdtj5cc7pk2b">bluesky</a>, or <a href="https://twitter.com/rebane2001/status/2018107789512474738">twitter</a>.</p>
+
     </dialog>
 <script type="text/javascript">
     /* PWA stuff */
     let installPrompt = null;
     const installButton = document.querySelector("#install");
+
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !navigator.standalone) {
+        installButton.classList.remove("hidden");
+        installButton.onclick = () => alert("To install Xikipedia as an app on iOS, open the site in Safari, tap the share button, and choose 'Add to Home Screen'.");
+    } else if (!window.matchMedia('(display-mode: standalone)').matches && !window.chrome) {
+        installButton.classList.remove("hidden");
+        installButton.onclick = () => alert("To install Xikipedia as an app, either open it in Chrome, or look into how to install PWAs in your web browser.");
+    }
+
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
       installPrompt = event;
@@ -606,7 +636,7 @@
     });
     installButton.addEventListener("click", async () => {
       if (!installPrompt) {
-        return;
+        return installButton.classList.add("hidden");
       }
       const result = await installPrompt.prompt();
       console.log(`Install prompt was: ${result.outcome}`);
@@ -619,13 +649,12 @@
     }
 
     window.swReg = null;
-    /*
     if ("serviceWorker" in navigator)
         navigator.serviceWorker.register("/sw.js").then(reg => window.swReg = reg).catch(err => {
             window.swReg = "err";
             console.error(`Registration failed with ${err}`);
         });
-    else*/
+    else
         window.swReg = "err";
 </script>
 <script type="text/javascript">
@@ -648,13 +677,13 @@
     const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
     let postsWithoutLike = 0;
 
-    const HTML_VERSION = "1.0.0";
+    const HTML_VERSION = "1.1.0";
 
     function loadSettings() {
         const baseSettings = {
-            storeData: false,
+            storeData: true,
             openMainWiki: true,
-            dataSize: 225690064,
+            dataSize: 228005406,
             profile: "default",
             profiles: ["default"],
             theme: "theme-auto",
@@ -682,11 +711,13 @@
         document.location.reload();
     }
 
-    function resetEverything(autoConfirm) {
+    async function resetEverything(autoConfirm) {
         if (!autoConfirm && !confirm("Are you sure you want to reset all data and settings?"))
             return;
-        if (!autoConfirm && window.swReg && window.swReg !== "err")
+        if (!autoConfirm && window.swReg && window.swReg !== "err") {
+            await (await fetch("/clearHtml")).text();
             return window.swReg.unregister().then(e=>resetEverything(true)).catch(e=>resetEverything(true));
+        }
         settings.profiles.forEach(e=>deleteProfile(e));
         localStorage.removeItem("xikipedia-settings");
         document.location.reload();
@@ -707,6 +738,7 @@
     const profilesModal = document.getElementById("profilesModal");
     const statsModal = document.getElementById("statsModal");
     const settingsModal = document.getElementById("settingsModal");
+    const aboutModal = document.getElementById("aboutModal");
 
     const profilesList = document.getElementById("profilesList");
     const storeDataWarning = document.getElementById("storeDataWarning");
@@ -887,7 +919,7 @@
         topStatsStale = false;
         const sorted = Object.entries(categoryScores).filter(e => e[1]).sort((a, b) => b[1] - a[1]);
         const top100 = sorted.slice(0, 100);
-        const bottom100 = sorted.slice(sorted.length-100);
+        const bottom100 = sorted.slice(sorted.length-100).reverse();
         document.getElementById("top100").innerText = top100.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
         document.getElementById("bottom100").innerText = bottom100.map(([k,v]) => `${convertCat(k)}: ${v}`).join("\n");
     }
@@ -922,6 +954,10 @@
 
     function showSettingsModal() {
         settingsModal.showModal();
+    }
+
+    function showAboutModal() {
+        aboutModal.showModal();
     }
 
     //const MAX_DEPTH = 10;
@@ -1105,11 +1141,11 @@ async function* streamToAsyncIterable(stream) {
         const bytes = new Uint8Array(DATA_SIZE);
         for await (const chunk of streamToAsyncIterable(resp.body)) {
             if (Math.floor(responseSize/DATA_SIZE*100) < Math.floor((responseSize+chunk.length)/DATA_SIZE*100))
-                startBtn.innerText = `Xikipedia is loading... (${Math.floor(responseSize/DATA_SIZE*100)}% of 40MB loaded)`;
+                startBtn.innerText = `Xikipedia is loading... (${Math.floor(responseSize/DATA_SIZE*100)}% of 34MB loaded)`;
             bytes.set(chunk, responseSize);
             responseSize += chunk.length;
         }
-        startBtn.innerText = `Xikipedia is loading... (100% downloaded)`;
+        startBtn.innerText = `Xikipedia is loading... (100% of 34MB loaded)`;
         await new Promise(requestAnimationFrame);
         await new Promise(requestAnimationFrame);
         return JSON.parse(new TextDecoder().decode(bytes));
@@ -1164,7 +1200,7 @@ async function* streamToAsyncIterable(stream) {
             await new Promise(r => setTimeout(r, 10));
         }
         checkVersionAsync();
-        loadStatus("downloading ~40MB of data");
+        loadStatus("loading data");
         //const smoldata = await (await fetch("smoldata.json")).json();
         const smoldata = await getFileWithProgress(DATA_URL);
 
@@ -1208,12 +1244,16 @@ async function* streamToAsyncIterable(stream) {
             });
             startScreen.hidePopover();
             startScreen.remove();
+            setTimeout(saveProfile,100);
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", "#15202B");
             requestAnimationFrame(render);
         }
         initProfile();
         if (hasProfile) {
             bottomNav.inert = false;
             startScreen.remove();
+            setTimeout(saveProfile,100);
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", "#15202B");
             requestAnimationFrame(render);
         }
     }
