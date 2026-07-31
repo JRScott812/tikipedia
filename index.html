@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Xikipedia</title>
+    <title>Xikipedia — Wikipedia Shorts</title>
     <meta property="og:url" content="https://xikipedia.org/">
-    <meta property="og:title" content="Xikipedia">
-    <meta name="description" content="Wikipedia you can doomscroll">
-    <meta property="og:description" content="Wikipedia you can doomscroll">
+    <meta property="og:title" content="Xikipedia — Wikipedia Shorts">
+    <meta name="description" content="Swipe through Simple Wikipedia as narrated short-form videos with captions.">
+    <meta property="og:description" content="Swipe through Simple Wikipedia as narrated short-form videos with captions.">
     <meta property="og:locale" content="en-us">
     <meta property="og:type" content="website">
     <meta content="#000000" name="theme-color" />
@@ -16,62 +16,95 @@
 </head>
 <body>
     <p id="loading">Loading...</p>
+    <header class="feedHeader" aria-label="Feed">
+        <span class="feedBrand">Xikipedia</span>
+        <div class="feedTabs" aria-label="Current feed">
+            <button type="button" class="feedTab followingTab" aria-controls="followingPage">Following</button>
+            <button type="button" class="feedTab forYouTab active" aria-controls="shortsFeed" aria-current="page">For You</button>
+        </div>
+    </header>
+    <section id="followingPage" aria-labelledby="followingTitle" hidden inert>
+        <div class="followingIntro">
+            <span class="followingEyebrow">Your interests</span>
+            <h1 id="followingTitle">Topics you follow</h1>
+            <p>Grouped privately from the shorts you watch, like, and open.</p>
+        </div>
+        <div class="followingFeed" id="followingGrid"></div>
+        <p class="followingEmpty" id="followingEmpty" hidden>Watch and like a few shorts to start building your topics.</p>
+    </section>
     <nav class="bottomNav">
-        <a href="https://xikipedia.org"><img src="/favicon.ico" class="logo" /></a>
-        <button data-icon="🙎🏻‍♂️" onclick="showProfilesModal()">Profiles</button>
+        <a href="https://xikipedia.org" aria-label="Xikipedia home"><span class="logo">📚</span></a>
+        <button class="homeNav active" data-icon="🏠" onclick="showForYouPage(); activePostEl?.scrollIntoView({behavior:'smooth'})">Home</button>
+        <button data-icon="👤" onclick="showProfilesModal()">Profiles</button>
         <button data-icon="📊" onclick="showStatsModal()">Stats</button>
         <button data-icon="⚙️" onclick="showSettingsModal()">Settings</button>
         <button data-icon="⬇️" id="install" class="hidden">Install</button>
     </nav>
-    <div class="posts"></div>
-    <button type="button" id="tapToPlay" aria-label="Tap to play audio"><span>Tap to play</span></button>
+    <div class="posts" id="shortsFeed"></div>
+    <button type="button" id="tapToPlay" aria-label="Tap to play audio"><span>▶️ Tap to play</span></button>
     <dialog id="descriptionSheet" closedby=any>
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
             <h2 id="descTitle"></h2>
-            <button type="button" class="closeButton closeDesc" aria-label="Close" style="background:#0000;color:#FFF;border:none;font-size:1.2rem;cursor:pointer">X</button>
+            <button type="button" class="closeButton closeDesc" aria-label="Close" style="background:#0000;color:#FFF;border:none;font-size:1.2rem;cursor:pointer">❌</button>
         </div>
         <p class="descSummary" id="descSummary"></p>
         <div class="descLinks" id="descLinks"></div>
         <div class="descActions">
-            <button type="button" class="openArticle" id="descOpenArticle">Open full article</button>
+            <button type="button" class="openArticle" id="descOpenArticle">📖 Open full article</button>
             <button type="button" class="closeDesc">Close</button>
         </div>
     </dialog>
     <div id="startScreen" popover=manual>
-        <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">by <a href="https://lyra.horse">rebane2001</a></h2></div>
-        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.</p>
-        <p style="margin-top:0">Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.</p>
-        <p style="margin-top:0">Source code on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>, discuss on <a href="https://infosec.exchange/@rebane2001/115998023365214091">fedi</a>, <a href="https://bsky.app/profile/rebane2001.bsky.social/post/3mdtj5cc7pk2b">bluesky</a>, or <a href="https://twitter.com/rebane2001/status/2018107789512474738">twitter</a>.</p>
-        <p style="margin-top:0;display:none" id="iosmessage">Note to iOS users: Apple arbitrarily limits the amount of memory a site can use, which means it's possible this site will crash before the loading finishes. I have no way to test for this myself as my iPhone does not do that. If this happens to you, try opening the site in desktop mode and see if that helps. If it still crashes, you'll just have to use this site from a different device. Blame Apple for creating undebuggable web platform issues while not letting you use an alternative browser engine on a device you supposedly own.</p>
-        <p style="font-weight: 600;margin:0">Pick some categories to get started (optional)</p>
+        <div><h1>Xikipedia</h1><h2 style="font-size: 100%;opacity:0.85;font-style:italic">Wikipedia, as short videos</h2></div>
+        <p><strong>Xikipedia</strong> turns <a href="https://simple.wikipedia.org/">Simple Wikipedia</a> into a vertical short-form feed: swipe for the next article, hear it narrated with your device’s voice, and follow along with word-by-word captions.</p>
+        <p style="margin-top:0">A local recommendation engine learns from what you watch, like, and open — nothing leaves your device. After the first load, it works offline and can be installed as an app.</p>
+        <p style="margin-top:0">Originally by <a href="https://lyra.horse">rebane2001</a>. Source on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>.</p>
+        <p style="margin-top:0;display:none" id="iosmessage">Note to iOS users: Apple limits how much memory a site can use, so loading may crash on some iPhones. Try desktop mode in Safari, or use another device if it still fails.</p>
+        <p style="font-weight: 600;margin:0">Pick topics to seed your For You feed (optional)</p>
         <div id="categoryPickList"></div>
-        <p style="font-weight: 600;margin:0">Or add your own</p>
+        <p style="font-weight: 600;margin:0">Or search for your own</p>
         <div id="categorySearch" style="display:flex;flex-direction:column">
             <input placeholder="Estonia..." disabled />
             <select size="5">
             </select>
         </div>
-        <p style="margin-top:auto">Since the content and images shown is from random Wikipedia articles, you will likely see NSFW content. Please only continue if you're an adult.</p>
+        <p style="margin-top:auto">Articles and images come from Wikipedia at random, so you may see NSFW content. Continue only if you’re an adult.</p>
         <button id="startBtn" disabled>I'm an adult, continue</button>
     </div>
     <dialog class="modal" id="profilesModal" closedby=any>
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Profiles</h2><button class="closeButton" aria-label="Close" onclick=profilesModal.close()>X</button></div>
-        <p id="storeDataWarning">Warning! You have disabled the "Store data" setting in settings, no data will get saved to your profiles until you turn the setting back on.</p>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Profiles</h2><button class="closeButton" aria-label="Close" onclick=profilesModal.close()>❌</button></div>
+        <p id="storeDataWarning">Warning: “Save my feed” is off, so likes and recommendations won’t be kept until you turn it back on in Settings.</p>
         <div id="profilesList"></div>
     </dialog>
     <dialog class="modal" id="statsModal" closedby=any>
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Statistics</h2><button class="closeButton" aria-label="Close" onclick=statsModal.close()>X</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Statistics</h2><button class="closeButton" aria-label="Close" onclick=statsModal.close()>❌</button></div>
         <p id="generalStats"></p>
         <details ontoggle=updateTopStats()><summary>Top categories</summary><div id="top100"></div></details>
         <details ontoggle=updateTopStats()><summary>Bottom categories</summary><div id="bottom100"></div></details>
-        <details ontoggle=updateLikeStats()><summary>Liked posts</summary><div id="likedPosts"></div></details>
+        <details ontoggle=updateLikeStats()><summary>Liked shorts</summary><div id="likedPosts"></div></details>
+        <details ontoggle=updateLikeStats()><summary>Disliked shorts</summary><div id="dislikedPosts"></div></details>
     </dialog>
     <dialog class="modal" id="settingsModal" closedby=any>
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Settings</h2><button class="closeButton" aria-label="Close" onclick=settingsModal.close()>X</button></div>
-        <label>Store data<input id="setting-storeData" type=checkbox></label>
-        <p>Whether to store your algorithm data locally (the data still never leaves your device). If this is turned off, your feed will start from scratch every time.</p>
-        <label>Open links in English Wikipedia<input id="setting-openMainWiki" type=checkbox></label>
-        <p>The articles are pulled from Simple English Wikipedia, but you can choose to still open them in (non-Simple) English Wikipedia.</p>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Settings</h2><button class="closeButton" aria-label="Close" onclick=settingsModal.close()>❌</button></div>
+        <label>Save my feed<input id="setting-storeData" type=checkbox></label>
+        <p>Keep likes, watch history, and recommendations on this device. Turn off to start fresh every visit. Nothing is sent to a server.</p>
+        <label>Open full articles in English Wikipedia<input id="setting-openMainWiki" type=checkbox></label>
+        <p>Shorts are built from Simple English Wikipedia. When you open the full article, use regular English Wikipedia instead.</p>
+        <pseudo-label>Narrator voice
+            <select id="setting-voice" aria-label="Text-to-speech voice">
+                <option value="">Default system voice</option>
+            </select>
+        </pseudo-label>
+        <p>Pick a voice from your browser or OS for short narration.</p>
+        <pseudo-label>Narration speed
+            <input id="setting-speechRate" type="range" min="0.7" max="1.4" step="0.1" value="1" aria-label="Speech rate">
+            <span id="speechRateLabel">1.0x</span>
+        </pseudo-label>
+        <p>Everyday playback speed. Press and hold a short for a temporary 2x boost.</p>
+        <button type="button" class="btn-outline" id="previewVoiceBtn" style="margin-bottom:8px">🗣️ Preview voice</button>
+        <h3 class="settingsSubhead">Caption color key</h3>
+        <p>Active subtitle words are outlined by type (heuristic tagging for Simple English).</p>
+        <ul class="colorKey" id="captionColorKey" aria-label="Caption color key"></ul>
         <pseudo-label>Theme
         <radio-picker aria-label="Theme picker" role="radiogroup">
             <label><input type="radio" name="theme" id="theme-auto" checked>Auto</label>
@@ -80,18 +113,16 @@
         </radio-picker>
         </pseudo-label>
         <div style="flex:1"></div>
-        <button class="btn-outline" onclick=showAboutModal() style="margin-bottom:8px">About Xikipedia</button>
-        <button class="btn-danger-outline" onclick=resetAlgorithm() style="margin-bottom:8px">Reset the algorithm</button>
+        <button class="btn-outline" onclick=showAboutModal() style="margin-bottom:8px">About</button>
+        <button class="btn-danger-outline" onclick=resetAlgorithm() style="margin-bottom:8px">Reset recommendations</button>
         <button class="btn-danger" onclick=resetEverything()>Delete all data</button>
     </dialog>
     <dialog class="modal" id="aboutModal" closedby=any>
-        <!-- TODO: do not dupe the text manually here -->
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>About Xikipedia</h2><button class="closeButton" aria-label="Close" onclick=aboutModal.close()>X</button></div>
-        <h3 style="font-size: 100%;opacity:0.85;font-style:italic;margin-bottom:16px">A project by <a href="https://lyra.horse">rebane2001</a></h3>
-        <p><strong>Xikipedia</strong> is a pseudo social media feed that algorithmically shows you content from <a href="https://simple.wikipedia.org/">Simple Wikipedia</a>. It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.</p><br>
-        <p style="margin-top:0">Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.</p><br>
-        <p style="margin-top:0">Source code on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>, discuss on <a href="https://infosec.exchange/@rebane2001/115998023365214091">fedi</a>, <a href="https://bsky.app/profile/rebane2001.bsky.social/post/3mdtj5cc7pk2b">bluesky</a>, or <a href="https://twitter.com/rebane2001/status/2018107789512474738">twitter</a>.</p>
-
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>About</h2><button class="closeButton" aria-label="Close" onclick=aboutModal.close()>❌</button></div>
+        <h3 style="font-size: 100%;opacity:0.85;font-style:italic;margin-bottom:16px">Wikipedia Shorts</h3>
+        <p><strong>Xikipedia</strong> is a short-form video feed of <a href="https://simple.wikipedia.org/">Simple Wikipedia</a> articles. Swipe vertically, listen with your device’s text-to-speech, and read colorful word-by-word captions.</p><br>
+        <p style="margin-top:0">Recommendations run entirely on your device from what you watch, like, and open. Install it as an app for offline browsing after the first download.</p><br>
+        <p style="margin-top:0">Based on work by <a href="https://lyra.horse">rebane2001</a>. Source on <a href="https://github.com/rebane2001/xikipedia">GitHub</a>.</p>
     </dialog>
 <script src="app.js" defer></script>
 </body>

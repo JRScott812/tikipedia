@@ -1,6 +1,7 @@
 {
-  "short_name": "Wiki Scroll",
-  "name": "Wikipedia Scroll",
+  "short_name": "Xikipedia",
+  "name": "Xikipedia — Wikipedia Shorts",
+  "description": "Swipe Simple Wikipedia as narrated short-form videos with captions.",
   "start_url": "/",
   "icons": [
     {

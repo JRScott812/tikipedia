@@ -39,16 +39,35 @@ def process_page(xml):
         categories.append(title.lower().replace("category:", "")[:-len(" songs")])
 
     thumb = None
-    for thumbptrnword in ["logo", "screenshot", "cover", "image", "map"]:
-        result = re.search(f'\\| *{thumbptrnword} *=(.+)', text, re.IGNORECASE)
-        if result:
-            thumb = result.group(1).strip()
-            break
-    if thumb is None:
-        if "[[File:" in text:
-            thumb = text.split("[[File:")[1].split("|")[0].split("]")[0].strip()
+    images = []
+    seen_images = set()
+
+    def add_image(raw):
+        if not raw:
+            return
+        name = raw.strip().split("|")[0].split("]")[0].strip()
+        name = re.sub(r'^(?:File|Image):', '', name, flags=re.IGNORECASE).strip()
+        if not name:
+            return
+        key = name.lower().replace(" ", "_")
+        if key in seen_images:
+            return
+        if re.search(r'\.(pdf|djvu|ogg|ogv|oga|webm|mid|midi|wav|mp3|flac|opus)$', name, re.I):
+            return
+        seen_images.add(key)
+        images.append(name)
+
+    for thumbptrnword in ["logo", "screenshot", "cover", "image", "map", "flag", "coat", "seal", "symbol", "crest", "arms"]:
+        for result in re.finditer(f'\\| *{thumbptrnword}[^=\\n]*=(.+)', text, re.IGNORECASE):
+            add_image(result.group(1))
+    for chunk in re.split(r'\[\[(?:File|Image):', text, flags=re.IGNORECASE)[1:]:
+        add_image(chunk.split("|")[0].split("]")[0])
+    if images:
+        thumb = images[0]
     if thumb is not None and len(thumb.strip()) == 0:
         thumb = f"{title}.png"
+        if not images:
+            images = [thumb]
 
     all_pages[title] = {
         "id": int(page["id"]),
@@ -56,6 +75,7 @@ def process_page(xml):
         "text": parsed_text,
         "categories": categories,
         "thumb": thumb,
+        "images": images,
         "disambiguation": "{{disambiguation}}" in text.lower() or "{{disambig}}" in text.lower() or "{{numberdis}}" in text.lower(),
     }
 
@@ -109,7 +129,7 @@ for page in all_pages.values():
     if page["disambiguation"] or len(re.sub("[\\s0-9]{2,4}", "", page["text"])) == 0 or re.match("^[0-9]{2,4}s?$", page["title"]) or (":" in page["title"] and page["title"].lower().split(":")[0] in ["module","category","template","wikimedia","mediawiki","wikipedia","help"]):
         noPageMaps[page["id"]] = page["title"]
         continue
-    pages2.append([page["title"],page["id"],page["text"],page["thumb"],page["categories"],links[page["id"]] if page["id"] in links else []])
+    pages2.append([page["title"],page["id"],page["text"],page["thumb"],page["categories"],links[page["id"]] if page["id"] in links else [], page.get("images") or ([page["thumb"]] if page["thumb"] else [])])
 # pages2.sort(key=lambda x:x[0])
 
 with open(OUT_JSON, "w") as f:
