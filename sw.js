@@ -1,4 +1,4 @@
-const SW_VERSION = '1.1.6';
+const SW_VERSION = '1.1.7';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -19,14 +19,15 @@ self.addEventListener("fetch", (event) => {
         status: 200,
         headers: { "Content-Type": "text/plain" },
       }))());
-  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", "smoldata.json", "smoldata.json.br"].includes(filename))
+  const SMOLDATA_FILES = ["smoldata.json", "smoldata.json.gz", "smoldata.json.br"];
+  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", ...SMOLDATA_FILES].includes(filename))
     return;
   event.respondWith((async () => {
     const request = event.request;
     const cachedResponse = await caches.match(request);
     if (cachedResponse)
       return cachedResponse;
-    const isSmolData = filename == "smoldata.json" || filename == "smoldata.json.br";
+    const isSmolData = SMOLDATA_FILES.includes(filename);
     // todo: delete after verifying the new one downloaded
     if (isSmolData)
       await caches.delete("smoldata");

@@ -1,4 +1,9 @@
 /* PWA stuff */
+// Everything resolves against the directory the app is served from, so it works
+// both at a domain root and under a subpath like /xikipedia/ on GitHub Pages.
+const BASE_PATH = new URL(".", document.baseURI).pathname;
+const basePath = (path) => `${BASE_PATH}${path}`;
+
 let installPrompt = null;
 const installButton = document.querySelector("#install");
 
@@ -20,7 +25,7 @@ installButton.addEventListener("click", async () => {
     return installButton.classList.add("hidden");
   }
   // make sure index is always cached
-  await (await fetch("/")).text();
+  await (await fetch(BASE_PATH)).text();
   const result = await installPrompt.prompt();
   console.log(`Install prompt was: ${result.outcome}`);
   disableInAppInstallPrompt();
@@ -33,7 +38,7 @@ function disableInAppInstallPrompt() {
 
 window.swReg = null;
 if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").then(reg => window.swReg = reg).catch(err => {
+    navigator.serviceWorker.register(basePath("sw.js"), {scope: BASE_PATH}).then(reg => window.swReg = reg).catch(err => {
         window.swReg = "err";
         console.error(`Registration failed with ${err}`);
     });
@@ -65,7 +70,7 @@ let lastSpentTime = Date.now();
 const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
 let postsWithoutLike = 0;
 
-const HTML_VERSION = "1.5.8";
+const HTML_VERSION = "1.5.9";
 const CAP_ROLE_COLORS = {
     noun: "#FFE566",
     verb: "#FF6B9D",
@@ -155,7 +160,7 @@ async function resetEverything(autoConfirm) {
     if (!autoConfirm && !confirm("Are you sure you want to reset all data and settings?"))
         return;
     if (!autoConfirm && window.swReg && window.swReg !== "err") {
-        await (await fetch("/clearHtml")).text();
+        await (await fetch(basePath("clearHtml"))).text();
         return window.swReg.unregister().then(e=>resetEverything(true)).catch(e=>resetEverything(true));
     }
     settings.profiles.forEach(e=>deleteProfile(e));
@@ -172,9 +177,26 @@ if (settings.dataSize !== EXPECTED_DATA_SIZE) {
     try { localStorage.setItem("xikipedia-settings", JSON.stringify(settings)); } catch {}
 }
 const DATA_SIZE = settings.dataSize;
+const EXPECTED_GZ_SIZE = 65480012;
 const EXPECTED_BR_SIZE = 35953875;
-const DATA_URL_JSON = `smoldata.json?${DATA_SIZE}`;
-const DATA_URL_BR = `smoldata.json.br?${DATA_SIZE}`;
+// Ordered by preference: plain JSON where the host can serve it, then formats the
+// browser can decode itself. Static hosts like GitHub Pages only have the archives.
+const DATA_SOURCES = [
+    {url: `smoldata.json?${DATA_SIZE}`, size: DATA_SIZE, format: null},
+    {url: `smoldata.json.gz?${DATA_SIZE}`, size: EXPECTED_GZ_SIZE, format: "gzip"},
+    {url: `smoldata.json.br?${DATA_SIZE}`, size: EXPECTED_BR_SIZE, format: "brotli"},
+];
+
+function canDecompress(format) {
+    if (!format) return true;
+    if (typeof DecompressionStream === "undefined") return false;
+    try {
+        new DecompressionStream(format);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 function formatDataProgress(loaded, total) {
     const expected = total > 0 ? total : DATA_SIZE;
@@ -2569,14 +2591,53 @@ function updateProgress(bytesProgress) {
     }
 }
 
-async function getFileWithProgress(urlOrResponse, { brotli = false } = {}) {
-    const resp = typeof urlOrResponse === "string"
-        ? await fetch(urlOrResponse, {cache: "force-cache"})
-        : urlOrResponse;
+// Re-emits a stream after peeking at its first bytes, so callers can sniff a
+// container format without buffering the whole body.
+async function peekStream(stream, byteCount) {
+    const reader = stream.getReader();
+    const head = [];
+    let peeked = 0;
+    let ended = false;
+    while (peeked < byteCount) {
+        const {done, value} = await reader.read();
+        if (done) {
+            ended = true;
+            break;
+        }
+        head.push(value);
+        peeked += value.byteLength;
+    }
+    const prefix = new Uint8Array(peeked);
+    let offset = 0;
+    for (const chunk of head) {
+        prefix.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    const rest = new ReadableStream({
+        start(controller) {
+            if (peeked)
+                controller.enqueue(prefix);
+            if (ended)
+                controller.close();
+        },
+        async pull(controller) {
+            const {done, value} = await reader.read();
+            if (done)
+                return controller.close();
+            controller.enqueue(value);
+        },
+        cancel(reason) {
+            return reader.cancel(reason);
+        }
+    });
+    return {prefix, stream: rest};
+}
+
+async function getFileWithProgress(resp, { format = null, expectedSize = DATA_SIZE } = {}) {
     if (!resp.ok)
         throw new Error(`Failed to load data (${resp.status})`);
     const contentLength = Number(resp.headers.get("Content-Length")) || 0;
-    progressTotal = contentLength > 0 ? contentLength : (brotli ? EXPECTED_BR_SIZE : DATA_SIZE);
+    progressTotal = contentLength > 0 ? contentLength : expectedSize;
     let responseSize = 0;
     const progressStream = new TransformStream({
         transform(chunk, controller) {
@@ -2586,10 +2647,15 @@ async function getFileWithProgress(urlOrResponse, { brotli = false } = {}) {
         }
     });
     let stream = resp.body.pipeThrough(progressStream);
-    if (brotli) {
-        if (typeof DecompressionStream === "undefined")
-            throw new Error("This browser can't decompress .br data; serve smoldata.json locally instead");
-        stream = stream.pipeThrough(new DecompressionStream("brotli"));
+    if (format === "gzip") {
+        // Some hosts serve .gz with Content-Encoding, in which case the browser has
+        // already decoded it; only decompress when the gzip magic bytes are present.
+        const peeked = await peekStream(stream, 2);
+        stream = peeked.prefix[0] === 0x1f && peeked.prefix[1] === 0x8b
+            ? peeked.stream.pipeThrough(new DecompressionStream("gzip"))
+            : peeked.stream;
+    } else if (format) {
+        stream = stream.pipeThrough(new DecompressionStream(format));
     }
     const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
     startBtn.innerText = `Loading shorts... (${formatDataProgress(progressTotal, progressTotal)})`;
@@ -2598,29 +2664,37 @@ async function getFileWithProgress(urlOrResponse, { brotli = false } = {}) {
     return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-// Prefer uncompressed JSON when present (local / nginx content-negotiation).
-// On GitHub Pages only smoldata.json.br exists, so fall back and decompress.
 async function loadSmoldata() {
-    const jsonResp = await fetch(DATA_URL_JSON, {cache: "force-cache"});
-    if (jsonResp.ok)
-        return getFileWithProgress(jsonResp, {brotli: false});
-    console.info("smoldata.json unavailable, loading smoldata.json.br");
-    return getFileWithProgress(DATA_URL_BR, {brotli: true});
+    const skipped = [];
+    for (const source of DATA_SOURCES) {
+        if (!canDecompress(source.format)) {
+            skipped.push(`${source.url.split("?")[0]} (no ${source.format} support)`);
+            continue;
+        }
+        const resp = await fetch(source.url, {cache: "force-cache"});
+        if (!resp.ok) {
+            skipped.push(`${source.url.split("?")[0]} (HTTP ${resp.status})`);
+            continue;
+        }
+        return getFileWithProgress(resp, {format: source.format, expectedSize: source.size});
+    }
+    throw new Error(`Couldn't load the dataset. Tried: ${skipped.join(", ")}`);
 }
 
 async function checkVersionAsync() {
     try {
         const versionInfo = await (await fetch("version.json", {cache: "no-store"})).json();
+        const hasWorker = window.swReg && window.swReg !== "err";
         if (versionInfo.html != HTML_VERSION) {
-            if (window.swReg) {
-                const res = await (await fetch("/clearHtml")).text();
+            if (hasWorker) {
+                const res = await (await fetch(basePath("clearHtml"))).text();
                 console.log(res);
             }
             document.location.reload();
             // || versionInfo.sw != settings.swVer
         }
-        if (window.swReg) {
-            const swVer = await (await fetch("/swVer")).text();
+        if (hasWorker) {
+            const swVer = await (await fetch(basePath("swVer"))).text();
             if (versionInfo.sw != swVer) {
                 await window.swReg.update();
                 document.location.reload();

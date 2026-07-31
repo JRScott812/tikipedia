@@ -2,7 +2,8 @@
   "short_name": "Xikipedia",
   "name": "Xikipedia — Wikipedia Shorts",
   "description": "Swipe Simple Wikipedia as narrated short-form videos with captions.",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "icons": [
     {
       "src": "favicon-48.png",
