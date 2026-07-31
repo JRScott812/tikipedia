@@ -1,4 +1,4 @@
-const SW_VERSION = '1.1.3';
+const SW_VERSION = '1.1.5';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -19,7 +19,7 @@ self.addEventListener("fetch", (event) => {
         status: 200,
         headers: { "Content-Type": "text/plain" },
       }))());
-  if (!["", "index.html", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", "smoldata.json"].includes(filename))
+  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", "smoldata.json"].includes(filename))
     return;
   event.respondWith((async () => {
     const request = event.request;
@@ -33,10 +33,13 @@ self.addEventListener("fetch", (event) => {
     const cache = await caches.open(isSmolData ? "smoldata" : "html");
     try {
       const networkResponse = await fetch(request);
-      if (isSmolData)
-        progressMonitor(event.clientId, networkResponse.clone());
-      await cache.put(request, networkResponse.clone());
-      return networkResponse;
+      // Cache a clone; return a progress-wrapped body to the page (don't discard it)
+      const responseForCache = networkResponse.clone();
+      const responseForClient = isSmolData
+        ? progressMonitor(event.clientId, networkResponse)
+        : networkResponse;
+      await cache.put(request, responseForCache);
+      return responseForClient;
     } catch (error) {
       return new Response("Network error happened", {
         status: 408,
@@ -81,7 +84,8 @@ function progressMonitor(clientId, response) {
 
             controller.enqueue(value);
             loaded += value.byteLength;
-            client.postMessage({event:"downloadProgress",data:loaded})
+            if (client)
+              client.postMessage({event:"downloadProgress",data:loaded})
             read();
           })
           .catch(error => {
