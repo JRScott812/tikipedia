@@ -1,11 +1,11 @@
 # xikipedia
-Wikipedia as a social media feed
+Wikipedia as a TikTok-style social media feed
 
-# Try it: [xikipedia.org](https://xikipedia.org/)
+# Try it: [xikipedia.org](https://jrscott812.github.io/xikipedia)
 
 ## About
 
-Xikipedia is a pseudo social media feed that algorithmically shows you content from [Simple Wikipedia](https://simple.wikipedia.org/). It is made as a demonstration of how even a basic non-ML algorithm with no data from other users can quickly learn what you engage with to suggest you more similar content. The algorithm runs locally and no data leaves your device.
+A modified version of [Xikipedia.org](https://xikipedia.org) but as a TikTok-style social feed, with videos.  All text & images come from the Wikipedia data dumps.  The voice uses the Text-to-Speech (TTS) from the browser/OS and can be changed in the settings.
 
 Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.
 
