@@ -65,7 +65,7 @@ let lastSpentTime = Date.now();
 const defaultCategories = ["nature", "science", "animals", "anthropology", "places", "sociology", "art", "mathematics", "games", "technology", "music", "human sexuality"];
 let postsWithoutLike = 0;
 
-const HTML_VERSION = "1.5.7";
+const HTML_VERSION = "1.5.8";
 const CAP_ROLE_COLORS = {
     noun: "#FFE566",
     verb: "#FF6B9D",
@@ -172,7 +172,9 @@ if (settings.dataSize !== EXPECTED_DATA_SIZE) {
     try { localStorage.setItem("xikipedia-settings", JSON.stringify(settings)); } catch {}
 }
 const DATA_SIZE = settings.dataSize;
-const DATA_URL = `smoldata.json?${DATA_SIZE}`;
+const EXPECTED_BR_SIZE = 35953875;
+const DATA_URL_JSON = `smoldata.json?${DATA_SIZE}`;
+const DATA_URL_BR = `smoldata.json.br?${DATA_SIZE}`;
 
 function formatDataProgress(loaded, total) {
     const expected = total > 0 ? total : DATA_SIZE;
@@ -2567,29 +2569,43 @@ function updateProgress(bytesProgress) {
     }
 }
 
-async function getFileWithProgress(url) {
-    const resp = await fetch(url, {cache: "force-cache"});
+async function getFileWithProgress(urlOrResponse, { brotli = false } = {}) {
+    const resp = typeof urlOrResponse === "string"
+        ? await fetch(urlOrResponse, {cache: "force-cache"})
+        : urlOrResponse;
     if (!resp.ok)
         throw new Error(`Failed to load data (${resp.status})`);
     const contentLength = Number(resp.headers.get("Content-Length")) || 0;
-    progressTotal = contentLength > 0 ? contentLength : DATA_SIZE;
+    progressTotal = contentLength > 0 ? contentLength : (brotli ? EXPECTED_BR_SIZE : DATA_SIZE);
     let responseSize = 0;
-    const chunks = [];
-    for await (const chunk of streamToAsyncIterable(resp.body)) {
-        chunks.push(chunk);
-        responseSize += chunk.length;
-        startBtn.innerText = `Loading shorts... (${formatDataProgress(responseSize, progressTotal)})`;
+    const progressStream = new TransformStream({
+        transform(chunk, controller) {
+            responseSize += chunk.byteLength;
+            startBtn.innerText = `Loading shorts... (${formatDataProgress(responseSize, progressTotal)})`;
+            controller.enqueue(chunk);
+        }
+    });
+    let stream = resp.body.pipeThrough(progressStream);
+    if (brotli) {
+        if (typeof DecompressionStream === "undefined")
+            throw new Error("This browser can't decompress .br data; serve smoldata.json locally instead");
+        stream = stream.pipeThrough(new DecompressionStream("brotli"));
     }
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
     startBtn.innerText = `Loading shorts... (${formatDataProgress(progressTotal, progressTotal)})`;
-    const bytes = new Uint8Array(responseSize);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-    }
     await new Promise(requestAnimationFrame);
     await new Promise(requestAnimationFrame);
     return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Prefer uncompressed JSON when present (local / nginx content-negotiation).
+// On GitHub Pages only smoldata.json.br exists, so fall back and decompress.
+async function loadSmoldata() {
+    const jsonResp = await fetch(DATA_URL_JSON, {cache: "force-cache"});
+    if (jsonResp.ok)
+        return getFileWithProgress(jsonResp, {brotli: false});
+    console.info("smoldata.json unavailable, loading smoldata.json.br");
+    return getFileWithProgress(DATA_URL_BR, {brotli: true});
 }
 
 async function checkVersionAsync() {
@@ -2644,8 +2660,7 @@ async function main() {
     checkVersionAsync();
     loadStatus("loading data");
     //setTimeout(()=>downloadFinished||loadStatus("this might take a minute on some connections"),5000)
-    //const smoldata = await (await fetch("smoldata.json")).json();
-    const smoldata = await getFileWithProgress(DATA_URL);
+    const smoldata = await loadSmoldata();
     downloadFinished = true;
 
     const subCategories = smoldata.subCategories;

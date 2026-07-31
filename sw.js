@@ -1,4 +1,4 @@
-const SW_VERSION = '1.1.5';
+const SW_VERSION = '1.1.6';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -19,20 +19,23 @@ self.addEventListener("fetch", (event) => {
         status: 200,
         headers: { "Content-Type": "text/plain" },
       }))());
-  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", "smoldata.json"].includes(filename))
+  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", "smoldata.json", "smoldata.json.br"].includes(filename))
     return;
   event.respondWith((async () => {
     const request = event.request;
     const cachedResponse = await caches.match(request);
     if (cachedResponse)
       return cachedResponse;
-    const isSmolData = filename == "smoldata.json";
+    const isSmolData = filename == "smoldata.json" || filename == "smoldata.json.br";
     // todo: delete after verifying the new one downloaded
     if (isSmolData)
       await caches.delete("smoldata");
     const cache = await caches.open(isSmolData ? "smoldata" : "html");
     try {
       const networkResponse = await fetch(request);
+      // Don't cache missing/error responses (e.g. smoldata.json 404 on GitHub Pages)
+      if (!networkResponse.ok)
+        return networkResponse;
       // Cache a clone; return a progress-wrapped body to the page (don't discard it)
       const responseForCache = networkResponse.clone();
       const responseForClient = isSmolData
