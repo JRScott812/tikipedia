@@ -1,6 +1,6 @@
 import { basePath } from "./path.js";
 import { state } from "./state.js";
-state.HTML_VERSION = "2.0.12";
+state.HTML_VERSION = "2.0.29";
 
 // Loaded from data/*.json before the app starts (see loadAppData).
 state.WIKI_LANGUAGES = [];
@@ -34,7 +34,8 @@ state.APP_DATA_FILES = [
 ];
 
 state.fetchJson = async function fetchJson(path) {
-	const res = await fetch(state.basePath(path), { cache: "force-cache" });
+	// no-cache: empty-cache hard refresh must still hit the network.
+	const res = await fetch(state.basePath(path), { cache: "no-cache" });
 	if (!res.ok) throw new Error(`Failed to load ${path} (${res.status})`);
 	return res.json();
 }
