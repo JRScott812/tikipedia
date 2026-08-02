@@ -1,0 +1,20 @@
+<section class="appPage" id="statsPage" aria-labelledby="statsTitle" hidden inert>
+	<h2 id="statsTitle">Statistics</h2>
+	<p id="generalStats"></p>
+	<details ontoggle=updateTopStats()>
+		<summary>Top categories</summary>
+		<div id="top100"></div>
+	</details>
+	<details ontoggle=updateTopStats()>
+		<summary>Bottom categories</summary>
+		<div id="bottom100"></div>
+	</details>
+	<details ontoggle=updateLikeStats()>
+		<summary>Liked shorts</summary>
+		<div id="likedPosts"></div>
+	</details>
+	<details ontoggle=updateLikeStats()>
+		<summary>Disliked shorts</summary>
+		<div id="dislikedPosts"></div>
+	</details>
+</section>

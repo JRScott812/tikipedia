@@ -5,17 +5,17 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<script>
-		// Deep links live at /p/Article_Title; keep asset URLs rooted at the app base.
+		// Deep links live at /p/{lang}/Article_Title; keep asset URLs rooted at the app base.
 		(() => {
-			let path = location.pathname;
+			let path = location.pathname || "/";
 			const pAt = path.indexOf("/p/");
-			if (pAt >= 0) path = path.slice(0, pAt + 1);
+			if (pAt >= 0) path = path.slice(0, pAt) || "/";
 			else path = path.replace(/\/(profiles|stats|settings|about|following)\/?$/, "/");
 			if (path.endsWith("index.html") || path.endsWith("404.html"))
 				path = path.replace(/[^/]+$/, "");
 			else if (!path.endsWith("/"))
-				path = path.replace(/\/[^/]*$/, "/");
-			if (!path) path = "/";
+				path = path.replace(/\/[^/]*$/, "/") || "/";
+			if (!path.endsWith("/")) path += "/";
 			document.write(`<base href="${path}">`);
 		})();
 	</script>
@@ -29,8 +29,8 @@
 	<meta property="og:locale" content="en-us">
 	<meta property="og:type" content="website">
 	<meta content="#000000" name="theme-color" />
-	<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" sizes="any" />
-	<link rel="apple-touch-icon" href="icons/favicon.svg" />
+	<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
+	<link rel="apple-touch-icon" href="favicon.svg" />
 	<link rel="manifest" href="app.webmanifest" />
 	<link rel="stylesheet" href="styles.css" />
 </head>
@@ -38,25 +38,28 @@
 <body>
 	<p id="loading">Loading...</p>
 	<header class="feedHeader" aria-label="Feed">
-		<span class="feedBrand">Tikipedia</span>
+		<span class="feedBrand" aria-label="Tikipedia"></span>
 		<div class="feedTabs" aria-label="Current feed">
 			<button type="button" class="feedTab followingTab" aria-controls="followingPage">Following</button>
 			<button type="button" class="feedTab forYouTab active" aria-controls="shortsFeed" aria-current="page">For
 				You</button>
 		</div>
-	</header>
-	<section class="appPage appPage--feed" id="followingPage" aria-labelledby="followingTitle" hidden inert>
-		<div class="followingIntro">
-			<span class="followingEyebrow">Your interests</span>
-			<h1 id="followingTitle">Topics you follow</h1>
-			<p>Grouped privately from the shorts you watch, like, and open.</p>
+		<div class="feedSearch">
+			<button type="button" class="feedSearchToggle" aria-label="Search articles" aria-expanded="false"
+				aria-controls="feedSearchPanel">
+				<img class="feedSearchIcon" src="icons/search.svg" alt="">
+			</button>
+			<form id="feedSearchPanel" class="feedSearchPanel" role="search" hidden>
+				<label class="sr-only" for="feedSearchInput">Search Wikipedia articles</label>
+				<input id="feedSearchInput" class="feedSearchInput" type="search" name="q"
+					placeholder="Search or paste /p/en/Title…" autocomplete="off" enterkeyhint="search" />
+				<ul id="feedSearchResults" class="feedSearchResults" role="listbox" hidden></ul>
+				<p id="feedSearchStatus" class="feedSearchStatus" hidden></p>
+			</form>
 		</div>
-		<div class="followingFeed" id="followingGrid"></div>
-		<p class="followingEmpty" id="followingEmpty" hidden>Watch and like a few shorts to start building your topics.
-		</p>
-	</section>
+	</header>
 	<nav class="bottomNav" aria-label="Main">
-		<a href="./" aria-label="Tikipedia home"><img class="logo" src="icons/favicon.svg" alt="Tikipedia"></a>
+		<a href="./" aria-label="Tikipedia home"><img class="logo" src="favicon.svg" alt="Tikipedia"></a>
 		<button type="button" class="homeNav active" data-nav="home"
 			onclick="showForYouPage(); activePostEl?.scrollIntoView({behavior:'smooth'})"><img class="navIcon"
 				src="icons/home.svg" alt="">Home</button>
@@ -85,114 +88,7 @@
 			<button type="button" class="closeDesc">Close</button>
 		</div>
 	</dialog>
-	<div id="startScreen" popover=manual>
-		<div>
-			<h1>Tikipedia</h1>
-			<h2 style="font-size: 100%;opacity:0.85;font-style:italic">Wikipedia, as short videos</h2>
-		</div>
-		<p><strong>Tikipedia</strong> turns <a href="https://www.wikipedia.org/">Wikipedia</a> into a vertical
-			short-form feed: swipe for the next article, hear it narrated with your device’s voice, and follow along
-			with word-by-word captions.</p>
-		<p style="margin-top:0">Articles are fetched live from Wikimedia. A local recommendation engine learns from what
-			you watch, like, and open — preferences stay on your device. Install it as an app for quick access (an
-			internet connection is required).</p>
-		<p style="margin-top:0">Originally by <a href="https://lyra.horse">rebane2001</a>. Source on <a
-				href="https://github.com/rebane2001/xikipedia">GitHub</a>.</p>
-		<p style="margin-top:0;display:none" id="iosmessage">Note to iOS users: if narration or install feels flaky, try
-			Safari desktop mode or another device.</p>
-		<p style="font-weight: 600;margin:0">Pick topics to seed your For You feed (optional)</p>
-		<div id="categoryPickList"></div>
-		<p style="font-weight: 600;margin:0">Or search for your own</p>
-		<div id="categorySearch" style="display:flex;flex-direction:column">
-			<input placeholder="Estonia..." disabled />
-			<select size="5">
-			</select>
-		</div>
-		<p style="margin-top:auto">Articles and images come from Wikipedia at random, so you may see NSFW content.
-			Continue only if you’re an adult.</p>
-		<button id="startBtn" disabled>I'm an adult, continue</button>
-	</div>
-	<section class="appPage" id="profilesPage" aria-labelledby="profilesTitle" hidden inert>
-		<h2 id="profilesTitle">Profiles</h2>
-		<p id="storeDataWarning">Warning: “Save my feed” is off, so likes and recommendations won’t be kept until you
-			turn it back on in Settings.</p>
-		<div id="profilesList"></div>
-	</section>
-	<section class="appPage" id="statsPage" aria-labelledby="statsTitle" hidden inert>
-		<h2 id="statsTitle">Statistics</h2>
-		<p id="generalStats"></p>
-		<details ontoggle=updateTopStats()>
-			<summary>Top categories</summary>
-			<div id="top100"></div>
-		</details>
-		<details ontoggle=updateTopStats()>
-			<summary>Bottom categories</summary>
-			<div id="bottom100"></div>
-		</details>
-		<details ontoggle=updateLikeStats()>
-			<summary>Liked shorts</summary>
-			<div id="likedPosts"></div>
-		</details>
-		<details ontoggle=updateLikeStats()>
-			<summary>Disliked shorts</summary>
-			<div id="dislikedPosts"></div>
-		</details>
-	</section>
-	<section class="appPage" id="settingsPage" aria-labelledby="settingsTitle" hidden inert>
-		<h2 id="settingsTitle">Settings</h2>
-		<label>Save my feed<input id="setting-storeData" type=checkbox></label>
-		<p>Keep likes, watch history, and recommendations on this device. Turn off to start fresh every visit.
-			Preferences stay local; article text is fetched from Wikipedia.</p>
-		<pseudo-label>Wikipedia language
-			<select id="setting-wikiLang" aria-label="Wikipedia language"></select>
-		</pseudo-label>
-		<p>Shorts are fetched live from this language edition. Recommendations are remembered separately per language.
-		</p>
-		<label>Open full articles in English Wikipedia<input id="setting-openMainWiki" type=checkbox></label>
-		<p>When you open the full article, use English Wikipedia instead of the selected language edition.</p>
-		<pseudo-label>Narrator voice
-			<select id="setting-voice" aria-label="Text-to-speech voice">
-				<option value="">Default system voice</option>
-			</select>
-		</pseudo-label>
-		<p id="voiceLangNote" hidden></p>
-		<p>Pick a voice from your browser or OS. Changing language auto-selects a matching voice when one is installed.
-		</p>
-		<pseudo-label>Narration speed
-			<input id="setting-speechRate" type="range" min="0.7" max="1.4" step="0.1" value="1"
-				aria-label="Speech rate">
-			<span id="speechRateLabel">1.0x</span>
-		</pseudo-label>
-		<p>Everyday playback speed. Press and hold a short for a temporary 2x boost.</p>
-		<button type="button" class="btn-outline" id="previewVoiceBtn" style="margin-bottom:8px">🗣️ Preview
-			voice</button>
-		<h3 class="settingsSubhead">Caption color key</h3>
-		<p>Active subtitle words are outlined by type (heuristic tagging).</p>
-		<ul class="colorKey" id="captionColorKey" aria-label="Caption color key"></ul>
-		<pseudo-label>Theme
-			<radio-picker aria-label="Theme picker" role="radiogroup">
-				<label><input type="radio" name="theme" id="theme-auto" checked>Auto</label>
-				<label><input type="radio" name="theme" id="theme-light">Light</label>
-				<label><input type="radio" name="theme" id="theme-dark">Dark</label>
-			</radio-picker>
-		</pseudo-label>
-		<div style="flex:1"></div>
-		<button type="button" class="btn-outline" onclick="showAboutPage()" style="margin-bottom:8px">About</button>
-		<button type="button" class="btn-danger-outline" onclick="resetAlgorithm()" style="margin-bottom:8px">Reset
-			recommendations</button>
-		<button type="button" class="btn-danger" onclick="resetEverything()">Delete all data</button>
-	</section>
-	<section class="appPage" id="aboutPage" aria-labelledby="aboutTitle" hidden inert>
-		<h2 id="aboutTitle">About</h2>
-		<h3 style="font-size: 100%;opacity:0.85;font-style:italic;margin-bottom:16px">Wikipedia Shorts</h3>
-		<p><strong>Tikipedia</strong> is a short-form video feed of <a href="https://www.wikipedia.org/">Wikipedia</a>
-			articles, fetched live in the language you choose. Swipe vertically, listen with your device’s
-			text-to-speech, and read colorful word-by-word captions.</p><br>
-		<p style="margin-top:0">Recommendations run on your device from what you watch, like, and open. An internet
-			connection is required to load new shorts.</p><br>
-		<p style="margin-top:0">Based on work by <a href="https://lyra.horse">rebane2001</a>. Source on <a
-				href="https://github.com/rebane2001/xikipedia">GitHub</a>.</p>
-	</section>
+	<div id="pageRoot"></div>
 	<script type="module" src="app.js"></script>
 </body>
 
