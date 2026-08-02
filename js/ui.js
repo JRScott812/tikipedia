@@ -56,21 +56,6 @@ if (state.previewVoiceBtn) state.previewVoiceBtn.onclick = (e) => {
 	state.previewSelectedVoice();
 };
 
-state.CAPTION_PREVIEW_SAMPLES = {
-	noun: "Wikipedia",
-	verb: "discovered",
-	adjective: "ancient",
-	adverb: "quickly",
-	preposition: "through",
-	article: "the",
-	pronoun: "they",
-	conjunction: "and",
-	number: "42",
-	date: "1945",
-	link: "Einstein",
-	other: "hello",
-};
-
 state.populateCaptionColorKey = function populateCaptionColorKey() {
 	const el = document.getElementById("captionColorKey");
 	if (!el) return;
@@ -88,47 +73,11 @@ state.populateCaptionColorKey = function populateCaptionColorKey() {
 		li.appendChild(label);
 		el.appendChild(li);
 	});
-	state.updateCaptionPreview();
-}
-
-state.updateCaptionPreview = function updateCaptionPreview() {
-	const word = document.getElementById("captionPreviewWord");
-	const meta = document.getElementById("captionPreviewMeta");
-	if (!word) return;
-	const roles = Object.keys(state.CAP_ROLE_LABELS || {});
-	if (!roles.length) {
-		word.textContent = "Wikipedia";
-		word.style.setProperty("--cap-color", "#FFE566");
-		if (meta) meta.textContent = "Preview";
-		return;
-	}
-	const i = (state._captionPreviewIndex || 0) % roles.length;
-	const role = roles[i];
-	word.textContent = state.CAPTION_PREVIEW_SAMPLES[role] || state.CAP_ROLE_LABELS[role] || "Aa";
-	word.style.setProperty("--cap-color", state.CAP_ROLE_COLORS[role] || "#FFE566");
-	if (meta) meta.textContent = state.CAP_ROLE_LABELS[role] || role;
-}
-
-state.startCaptionPreviewCycle = function startCaptionPreviewCycle() {
-	state.stopCaptionPreviewCycle();
-	state.updateCaptionPreview();
-	state._captionPreviewTimer = setInterval(() => {
-		const roles = Object.keys(state.CAP_ROLE_LABELS || {});
-		if (!roles.length) return;
-		state._captionPreviewIndex = ((state._captionPreviewIndex || 0) + 1) % roles.length;
-		state.updateCaptionPreview();
-	}, 1600);
-}
-
-state.stopCaptionPreviewCycle = function stopCaptionPreviewCycle() {
-	if (state._captionPreviewTimer) {
-		clearInterval(state._captionPreviewTimer);
-		state._captionPreviewTimer = null;
-	}
 }
 
 state.initDataDependentUi = function initDataDependentUi() {
 	state.settings = state.loadSettings();
+	state.prefetchTopicIcons?.();
 	if (state.wikiLangSelect) {
 		state.wikiLangSelect.innerHTML = "";
 		state.WIKI_LANGUAGES.forEach(lang => {
@@ -313,9 +262,6 @@ state.showAppPage = function showAppPage(name, { historyMode = "replace" } = {})
 	const prev = state.currentAppPage;
 	state.currentAppPage = name || "foryou";
 	document.body.dataset.page = state.currentAppPage;
-	if (prev === "settings" && state.currentAppPage !== "settings")
-		state.stopCaptionPreviewCycle();
-
 	state.hideAllAppPages();
 
 	if (state.currentAppPage === "foryou") {
@@ -385,7 +331,6 @@ state.prepareSettingsPage = function prepareSettingsPage() {
 	if (state.wikiLangSelect) state.wikiLangSelect.value = state.settings.wikiLang;
 	state.populateVoiceOptions();
 	state.updateVoiceLangNote();
-	state.startCaptionPreviewCycle();
 };
 
 state.showFollowingPage = function showFollowingPage() {

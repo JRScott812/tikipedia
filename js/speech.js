@@ -289,17 +289,25 @@ state.scheduleShortLoop = function scheduleShortLoop(delayMs = 400) {
 		clearTimeout(window._shortLoopTimer);
 		window._shortLoopTimer = null;
 	}
+	// Don't cut off a late linked-article image before it has had time on screen.
+	const linkHold = state.linkImageRemainingMs?.(state.activePostEl) || 0;
+	const delay = Math.max(delayMs, linkHold ? linkHold + 250 : 0);
 	window._shortLoopTimer = setTimeout(() => {
 		window._shortLoopTimer = null;
 		state.loopCurrentShort();
-	}, delayMs);
+	}, delay);
 }
 
 state.loopCurrentShort = function loopCurrentShort() {
 	if (!state.canLoopCurrentShort()) return;
 	const postEl = state.activePostEl;
 	const post = state.activePostData;
+	if (postEl._linkClearTimer) {
+		clearTimeout(postEl._linkClearTimer);
+		postEl._linkClearTimer = null;
+	}
 	postEl._showingLink = null;
+	postEl._linkShownAt = 0;
 	postEl._slideIndex = 0;
 	const visual = postEl.querySelector(".visual");
 	if (visual) state.showSlideImage(visual, 0);
@@ -403,6 +411,47 @@ state.speakPost = function speakPost(postEl, post, { restart = true } = {}) {
 	state.setPausedUi(postEl, false);
 	state.speakFrom(postEl, post, restart ? 0 : state.captionIndex);
 }
+
+/** Map a pointer X on the progress bar to a caption word index. */
+state.captionIndexFromProgressEvent = function captionIndexFromProgressEvent(progressEl, postEl, e) {
+	const words = postEl.querySelectorAll(".caption-word");
+	const n = words.length;
+	if (!n) return 0;
+	const rect = progressEl.getBoundingClientRect();
+	const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / Math.max(1, rect.width)));
+	return Math.round(ratio * (n - 1));
+};
+
+/** Update captions/progress without starting speech (used while dragging). */
+state.previewCaptionSeek = function previewCaptionSeek(postEl, index) {
+	const words = [...postEl.querySelectorAll(".caption-word")];
+	if (!words.length) return 0;
+	const i = Math.max(0, Math.min(index, words.length - 1));
+	state.stopPlayback();
+	state.captionWords = words;
+	state.resetCaptionStyles(words);
+	state.highlightCaptionWord(i);
+	return i;
+};
+
+state.seekCaptionToIndex = function seekCaptionToIndex(postEl, post, index, { resume = true } = {}) {
+	const i = state.previewCaptionSeek(postEl, index);
+	state.captionIndex = i;
+	if (!resume) {
+		state.playbackPaused = true;
+		state.setPausedUi(postEl, true);
+		return i;
+	}
+	state.playbackPaused = false;
+	state.setPausedUi(postEl, false);
+	if (!state.speechUnlocked && !state.settings.muted) {
+		state.tapToPlay.dataset.show = "1";
+		state.startTimedCaptions(state.captionWords, state.playbackRate, i);
+		return i;
+	}
+	state.speakFrom(postEl, post, i);
+	return i;
+};
 
 // speechSynthesis.pause() is unreliable across browsers, so stop and remember the word instead.
 state.pausePlayback = function pausePlayback() {
@@ -597,17 +646,18 @@ state.under100 = function under100(n) {
 	if (n < 20) return state.TEENS[n - 10];
 	const t = Math.floor(n / 10);
 	const o = n % 10;
-	return o ? `${TENS[t]}-${ONES[o]}` : state.TENS[t];
+	return o ? `${state.TENS[t]}-${state.ONES[o]}` : state.TENS[t];
 }
 
 state.speakYearEn = function speakYearEn(year) {
 	const y = Number(year);
 	if (!Number.isFinite(y) || y < 0) return String(year);
 	if (y < 1000) return state.under100(y) || String(y);
-	if (y >= 2000 && y <= 2009) return y === 2000 ? "two thousand" : `two thousand ${ONES[y % 10]}`;
+	if (y >= 2000 && y <= 2009)
+		return y === 2000 ? "two thousand" : `two thousand ${state.ONES[y % 10]}`;
 	if (y >= 2010 && y <= 2099) {
 		const rest = y % 100;
-		return rest < 10 ? `two thousand ${ONES[rest]}` : `twenty ${under100(rest)}`;
+		return rest < 10 ? `two thousand ${state.ONES[rest]}` : `twenty ${state.under100(rest)}`;
 	}
 	const century = Math.floor(y / 100);
 	const rest = y % 100;
@@ -616,8 +666,8 @@ state.speakYearEn = function speakYearEn(year) {
 	else if (century >= 20 && century <= 99) head = state.under100(century);
 	else head = String(century);
 	if (rest === 0) return `${head} hundred`;
-	if (rest < 10) return `${head} oh ${ONES[rest]}`;
-	return `${head} ${under100(rest)}`;
+	if (rest < 10) return `${head} oh ${state.ONES[rest]}`;
+	return `${head} ${state.under100(rest)}`;
 }
 
 state.speakDecadeEn = function speakDecadeEn(token) {
@@ -625,7 +675,7 @@ state.speakDecadeEn = function speakDecadeEn(token) {
 	if (!m) return null;
 	const base = Number(m[1]);
 	if (base % 10 !== 0) return null;
-	if (base % 100 === 0) return `${speakYearEn(base)}s`.replace(/ hundred$/, " hundreds");
+	if (base % 100 === 0) return `${state.speakYearEn(base)}s`.replace(/ hundred$/, " hundreds");
 	const spoken = state.speakYearEn(base);
 	if (spoken.endsWith("ty")) return `${spoken.slice(0, -1)}ies`;
 	return `${spoken}s`;
@@ -675,7 +725,7 @@ state.speakYearRange = function speakYearRange(token, lang) {
 	if (m[2].length <= 2) b = Math.floor(a / 100) * 100 + b;
 	const connector = state.RANGE_CONNECTORS[lang] || state.RANGE_CONNECTORS[state.getWikiLangInfo(lang).bcp47] || ",";
 	if (state.isEnglishSpeechLang())
-		return `${speakYearEn(a)} ${connector} ${speakYearEn(b)}${m[3] || ""}`;
+		return `${state.speakYearEn(a)} ${connector} ${state.speakYearEn(b)}${m[3] || ""}`;
 	return `${a} ${connector} ${b}${m[3] || ""}`;
 }
 
@@ -695,7 +745,7 @@ state.tokenSpeechForm = function tokenSpeechForm(tokens, index) {
 			return `${decade}${punct || ""} `;
 
 		if (/^\d{3,4}$/.test(core) && state.isDateContext(tokens, index))
-			return `${speakYearEn(core)}${punct || ""} `;
+			return `${state.speakYearEn(core)}${punct || ""} `;
 
 		// Month D, YYYY  /  Month D YYYY
 		if (state.isMonthToken(core)) {
@@ -705,7 +755,7 @@ state.tokenSpeechForm = function tokenSpeechForm(tokens, index) {
 			const year = state.stripTrailingPunct(yearTok || "").core;
 			if (/^\d{1,2}$/.test(day) && /^\d{3,4}$/.test(year)) {
 				const ord = state.ORDINAL_WORDS[Number(day)] || day;
-				return `${core} ${ord}, ${speakYearEn(year)} `;
+				return `${core} ${ord}, ${state.speakYearEn(year)} `;
 			}
 			if (/^\d{1,2}$/.test(day)) {
 				const ord = state.ORDINAL_WORDS[Number(day)] || day;
@@ -720,7 +770,7 @@ state.tokenSpeechForm = function tokenSpeechForm(tokens, index) {
 			const year = state.stripTrailingPunct(yearTok || "").core;
 			const ord = state.ORDINAL_WORDS[Number(core)] || core;
 			if (/^\d{3,4}$/.test(year))
-				return `${ord} of ${month} ${speakYearEn(year)} `;
+				return `${ord} of ${month} ${state.speakYearEn(year)} `;
 			return `${ord} of ${month}${punct || ""} `;
 		}
 	} else {
@@ -746,7 +796,13 @@ state.annotateSpeechTokens = function annotateSpeechTokens(spans) {
 
 	for (let i = 0; i < display.length; i++) {
 		if (consumed.has(i)) continue;
-		const form = state.tokenSpeechForm(display, i);
+		let form = null;
+		try {
+			form = state.tokenSpeechForm(display, i);
+		} catch (err) {
+			console.warn("tokenSpeechForm failed", display[i], err);
+			continue;
+		}
 		if (!form) continue;
 		spoken[i] = form.endsWith(" ") ? form : `${form} `;
 

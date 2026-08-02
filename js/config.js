@@ -1,6 +1,6 @@
 import { basePath } from "./path.js";
 import { state } from "./state.js";
-state.HTML_VERSION = "2.0.29";
+state.HTML_VERSION = "2.0.34";
 
 // Loaded from data/*.json before the app starts (see loadAppData).
 state.WIKI_LANGUAGES = [];
@@ -23,6 +23,10 @@ state.PREFETCH_AHEAD = 3;
 state.RELATED_LINK_CAP = 8;
 state.DOUBLE_TAP_MS = 260;
 state.IMAGE_SLIDE_MS = 3500;
+/** Minimum time to keep a caption-linked article image on screen. */
+state.LINK_IMAGE_MIN_MS = 2500;
+/** Start showing a linked image this many caption words early. */
+state.LINK_IMAGE_LOOKAHEAD = 4;
 state.articleImageCache = new Map();
 state.summaryLinkRefCache = new Map();
 state.APP_DATA_FILES = [

@@ -77,7 +77,9 @@ state.applyAvatarRepresentation = function applyAvatarRepresentation(avatar, rep
 	avatar._repToken = token;
 	avatar.replaceChildren();
 	avatar.textContent = emoji;
-	if (rep.image) {
+
+	const mountUrl = (url) => {
+		if (!url || avatar._repToken !== token) return;
 		const img = document.createElement("img");
 		img.alt = "";
 		img.draggable = false;
@@ -88,15 +90,17 @@ state.applyAvatarRepresentation = function applyAvatarRepresentation(avatar, rep
 			avatar.replaceChildren();
 			avatar.textContent = emoji;
 		};
-		state.resolveFileThumbUrl(rep.image, 96).then(url => {
-			if (!url || avatar._repToken !== token) return;
-			img.onload = () => {
-				if (avatar._repToken !== token) return;
-				avatar.replaceChildren(img);
-			};
-			img.src = url;
-		});
-	}
+		img.onload = () => {
+			if (avatar._repToken !== token) return;
+			avatar.replaceChildren(img);
+		};
+		img.src = url;
+	};
+
+	// imageUrl = ready thumb from pageimages; image = File: title to resolve.
+	if (rep.imageUrl) mountUrl(rep.imageUrl);
+	else if (rep.image) state.resolveFileThumbUrl(rep.image, 96).then(mountUrl);
+
 	if (sourceLine) {
 		const category = state.representationCategoryLabel(rep);
 		sourceLine.textContent = category;
@@ -281,8 +285,27 @@ state.hydrateArticleAvatar = async function hydrateArticleAvatar(avatar, post, s
 		image: null,
 		group: fallback,
 	}, sourceLine);
+
 	const rep = await state.fetchArticleRepresentation(post);
-	if (rep) state.applyAvatarRepresentation(avatar, rep, sourceLine);
+	if (rep) {
+		state.applyAvatarRepresentation(avatar, rep, sourceLine);
+		if (rep.image || rep.imageUrl) return;
+	}
+
+	// Most articles aren't stubs/series with icons — use the topic group's
+	// Wikimedia lead image so the rail shows category art, not only emoji.
+	const group = rep?.group || fallback;
+	const imageUrl = await state.fetchTopicIcon(group);
+	if (!imageUrl) return;
+	state.applyAvatarRepresentation(avatar, {
+		kind: rep?.kind || "topic",
+		label: rep?.label || group.label,
+		emoji: rep?.emoji || group.emoji,
+		accent: rep?.accent || group.accent,
+		imageUrl,
+		group,
+		subject: rep?.subject,
+	}, sourceLine);
 }
 
 state.getFollowedTopics = function getFollowedTopics(limit = 48) {
@@ -310,15 +333,18 @@ state.getFollowedTopics = function getFollowedTopics(limit = 48) {
 state.topicIconCache = new Map();
 
 state.pageImageThumbFromQuery = function pageImageThumbFromQuery(data) {
-	const page = Object.values(data?.query?.pages || {})[0];
-	if (!page || page.missing != null) return null;
-	const source = page?.thumbnail?.source || "";
-	const file = page?.pageimage || "";
-	// Prefer real image thumbs; skip raw video files without a raster thumb.
-	if (!source) return null;
-	if (/\.(webm|ogv|ogg)$/i.test(file) && !/\/thumb\//.test(source))
-		return null;
-	return source;
+	const pages = Object.values(data?.query?.pages || {});
+	for (const page of pages) {
+		if (!page || page.missing != null) continue;
+		const source = page?.thumbnail?.source || "";
+		const file = page?.pageimage || "";
+		// Prefer real image thumbs; skip raw video files without a raster thumb.
+		if (!source) continue;
+		if (/\.(webm|ogv|ogg)$/i.test(file) && !/\/thumb\//.test(source))
+			continue;
+		return source;
+	}
+	return null;
 }
 
 state.fetchTopicIcon = function fetchTopicIcon(group) {
@@ -327,30 +353,37 @@ state.fetchTopicIcon = function fetchTopicIcon(group) {
 	if (state.topicIconCache.has(cacheKey)) return state.topicIconCache.get(cacheKey);
 	const promise = (async () => {
 		const queryPage = async (lang) => {
-			const data = await state.wikiQuery({
-				action: "query",
-				redirects: 1,
-				prop: "pageimages",
-				piprop: "thumbnail|name",
-				pithumbsize: 128,
-				titles: group.wikiPage,
-			}, { lang });
-			return state.pageImageThumbFromQuery(data);
+			try {
+				const data = await state.wikiQuery({
+					action: "query",
+					redirects: 1,
+					prop: "pageimages",
+					piprop: "thumbnail|name",
+					pithumbsize: 128,
+					titles: group.wikiPage,
+				}, { lang });
+				return state.pageImageThumbFromQuery(data);
+			} catch {
+				return null;
+			}
 		};
-		try {
-			const local = await queryPage(state.settings.wikiLang);
-			if (local) return local;
-			// Topic labels are English wiki titles — fall back when the
-			// selected language edition has no lead image.
-			if (state.settings.wikiLang !== "en")
-				return await queryPage("en");
-		} catch {
-			return null;
-		}
+		const localLang = state.settings.wikiLang || "simple";
+		const local = await queryPage(localLang);
+		if (local) return local;
+		// Topic hub pages are English titles; many simple/other editions omit lead images.
+		if (localLang !== "en")
+			return await queryPage("en");
 		return null;
 	})();
 	state.topicIconCache.set(cacheKey, promise);
 	return promise;
+}
+
+/** Warm topic-icon cache so Following + rail avatars rarely sit on emoji. */
+state.prefetchTopicIcons = function prefetchTopicIcons() {
+	(state.TOPIC_GROUPS || []).forEach(group => {
+		if (group?.wikiPage) state.fetchTopicIcon(group);
+	});
 }
 
 state.makeTopicIcon = function makeTopicIcon(group) {

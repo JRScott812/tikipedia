@@ -159,13 +159,15 @@ state.buildPostElement = function buildPostElement(post) {
 
 	const progress = document.createElement("div");
 	progress.className = "playbackProgress";
-	progress.setAttribute("role", "progressbar");
-	progress.setAttribute("aria-label", "Narration progress");
+	progress.setAttribute("role", "slider");
+	progress.setAttribute("aria-label", "Scrub narration");
 	progress.setAttribute("aria-valuemin", "0");
 	progress.setAttribute("aria-valuemax", "100");
 	progress.setAttribute("aria-valuenow", "0");
+	progress.setAttribute("tabindex", "0");
 	progress.style.setProperty("--progress", "0%");
 	postDiv.appendChild(progress);
+	state.bindProgressScrub(progress, postDiv, post);
 
 	const overlay = document.createElement("div");
 	overlay.className = "overlay";
@@ -276,9 +278,76 @@ state.buildPostElement = function buildPostElement(post) {
 	return postDiv;
 }
 
+state.bindProgressScrub = function bindProgressScrub(progressEl, postEl, post) {
+	let scrubbing = false;
+	let wasPaused = false;
+	let lastIndex = 0;
+
+	const begin = (e) => {
+		if (state.activePostEl !== postEl) return;
+		e.preventDefault();
+		e.stopPropagation();
+		scrubbing = true;
+		wasPaused = !!state.playbackPaused;
+		progressEl.dataset.scrubbing = "1";
+		try { progressEl.setPointerCapture(e.pointerId); } catch { /* older engines */ }
+		if (state.holdTimer) {
+			clearTimeout(state.holdTimer);
+			state.holdTimer = null;
+		}
+		state.holdingSpeed = false;
+		state.pointerStart = null;
+		if (state.pendingTapTimer) {
+			clearTimeout(state.pendingTapTimer);
+			state.pendingTapTimer = null;
+		}
+		lastIndex = state.previewCaptionSeek(
+			postEl,
+			state.captionIndexFromProgressEvent(progressEl, postEl, e),
+		);
+	};
+
+	const move = (e) => {
+		if (!scrubbing) return;
+		e.preventDefault();
+		lastIndex = state.previewCaptionSeek(
+			postEl,
+			state.captionIndexFromProgressEvent(progressEl, postEl, e),
+		);
+	};
+
+	const end = () => {
+		if (!scrubbing) return;
+		scrubbing = false;
+		delete progressEl.dataset.scrubbing;
+		state.seekCaptionToIndex(postEl, post, lastIndex, { resume: !wasPaused });
+	};
+
+	progressEl.addEventListener("pointerdown", begin);
+	progressEl.addEventListener("pointermove", move);
+	progressEl.addEventListener("pointerup", end);
+	progressEl.addEventListener("pointercancel", end);
+
+	progressEl.addEventListener("keydown", (e) => {
+		if (state.activePostEl !== postEl) return;
+		const words = postEl.querySelectorAll(".caption-word");
+		if (!words.length) return;
+		let next = state.captionIndex || 0;
+		const step = Math.max(1, Math.round(words.length / 20));
+		if (e.key === "ArrowRight" || e.key === "ArrowUp") next += step;
+		else if (e.key === "ArrowLeft" || e.key === "ArrowDown") next -= step;
+		else if (e.key === "Home") next = 0;
+		else if (e.key === "End") next = words.length - 1;
+		else return;
+		e.preventDefault();
+		e.stopPropagation();
+		state.seekCaptionToIndex(postEl, post, next, { resume: !state.playbackPaused });
+	});
+};
+
 state.bindPostGestures = function bindPostGestures(postDiv, post, likeBtn) {
 	postDiv.addEventListener("pointerdown", (e) => {
-		if (e.target.closest(".sideActions, .iconBtn, a, button")) return;
+		if (e.target.closest(".sideActions, .iconBtn, a, button, .playbackProgress")) return;
 		state.pointerDownAt = Date.now();
 		state.pointerStart = { x: e.clientX, y: e.clientY };
 		state.gestureMoved = false;
@@ -318,7 +387,7 @@ state.bindPostGestures = function bindPostGestures(postDiv, post, likeBtn) {
 			state.pointerStart = null;
 			return;
 		}
-		if (e.target.closest(".sideActions, .iconBtn, a, button")) {
+		if (e.target.closest(".sideActions, .iconBtn, a, button, .playbackProgress")) {
 			state.pointerStart = null;
 			return;
 		}

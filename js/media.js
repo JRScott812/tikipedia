@@ -163,6 +163,7 @@ state.ensureLinkedArticleImage = function ensureLinkedArticleImage(visual, page)
 	img = state.makeMediaImg(state.commonsThumbUrl(file));
 	img.dataset.link = String(page.id);
 	img.dataset.file = key;
+	img.loading = "eager";
 	img._visual = visual;
 	visual.appendChild(img);
 	return img;
@@ -176,8 +177,14 @@ state.showLinkedArticleImage = function showLinkedArticleImage(postEl, pageId) {
 	if (!target) return;
 	if (target.dataset.active === "1" && postEl._showingLink === String(pageId))
 		return;
+	if (postEl._linkClearTimer) {
+		clearTimeout(postEl._linkClearTimer);
+		postEl._linkClearTimer = null;
+	}
 	state.stopImageSlideshow(postEl);
 	postEl._showingLink = String(pageId);
+	postEl._linkShownAt = Date.now();
+	target.loading = "eager";
 	const imgs = state.slideMediaImages(visual);
 	const idx = imgs.indexOf(target);
 	if (idx >= 0) postEl._slideIndex = idx;
@@ -189,7 +196,12 @@ state.showLinkedArticleImage = function showLinkedArticleImage(postEl, pageId) {
 
 state.clearLinkedArticleImage = function clearLinkedArticleImage(postEl) {
 	if (!postEl || !postEl._showingLink) return;
+	if (postEl._linkClearTimer) {
+		clearTimeout(postEl._linkClearTimer);
+		postEl._linkClearTimer = null;
+	}
 	postEl._showingLink = null;
+	postEl._linkShownAt = 0;
 	const visual = postEl.querySelector(".visual");
 	if (!visual) return;
 	const slides = state.slideMediaImages(visual);
@@ -201,15 +213,55 @@ state.clearLinkedArticleImage = function clearLinkedArticleImage(postEl) {
 		state.startImageSlideshow(postEl);
 }
 
+/** Keep late-summary link art on screen long enough to read. */
+state.linkImageRemainingMs = function linkImageRemainingMs(postEl) {
+	if (!postEl?._showingLink && !postEl?._linkShownAt) return 0;
+	const shownAt = postEl._linkShownAt || 0;
+	if (!shownAt) return state.LINK_IMAGE_MIN_MS || 2500;
+	const minMs = state.LINK_IMAGE_MIN_MS || 2500;
+	return Math.max(0, minMs - (Date.now() - shownAt));
+};
+
+state.scheduleClearLinkedArticleImage = function scheduleClearLinkedArticleImage(postEl) {
+	if (!postEl?._showingLink) return;
+	if (postEl._linkClearTimer) {
+		clearTimeout(postEl._linkClearTimer);
+		postEl._linkClearTimer = null;
+	}
+	const remain = state.linkImageRemainingMs(postEl);
+	postEl._linkClearTimer = setTimeout(() => {
+		postEl._linkClearTimer = null;
+		state.clearLinkedArticleImage(postEl);
+	}, remain);
+};
+
+state.captionLinkIdNear = function captionLinkIdNear(wordEl) {
+	const direct = wordEl?.dataset?.linkId || null;
+	if (direct) return direct;
+	const words = state.captionWords || [];
+	const idx = wordEl ? words.indexOf(wordEl) : -1;
+	if (idx < 0) return null;
+	const ahead = state.LINK_IMAGE_LOOKAHEAD ?? 4;
+	for (let j = idx + 1; j <= Math.min(idx + ahead, words.length - 1); j++) {
+		const id = words[j]?.dataset?.linkId;
+		if (id) return id;
+	}
+	return null;
+};
+
 state.syncCaptionLinkedImage = function syncCaptionLinkedImage(postEl, wordEl) {
 	if (!postEl) return;
-	const linkId = wordEl?.dataset?.linkId || null;
+	const linkId = state.captionLinkIdNear(wordEl);
 	if (linkId) {
 		if (postEl._showingLink !== String(linkId))
 			state.showLinkedArticleImage(postEl, linkId);
+		else if (postEl._linkClearTimer) {
+			clearTimeout(postEl._linkClearTimer);
+			postEl._linkClearTimer = null;
+		}
 		return;
 	}
-	state.clearLinkedArticleImage(postEl);
+	state.scheduleClearLinkedArticleImage(postEl);
 }
 
 state.startImageSlideshow = function startImageSlideshow(postEl) {

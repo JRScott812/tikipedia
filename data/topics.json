@@ -186,7 +186,7 @@
 			"id": "society",
 			"label": "Society & Politics",
 			"emoji": "⚖️",
-			"wikiPage": "Society",
+			"wikiPage": "Culture",
 			"accent": "#93C5FD",
 			"patterns": [
 				"\\b(politic|government|law|legal|leader|president|prime minister|parliament|election|diplomacy|human rights|sociology|anthropology|culture|society|religion|christian|islam|muslim|judaism|jewish|hindu|buddhist|church|faith|philosophy|ethic)\\b"

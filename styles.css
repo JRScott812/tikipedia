@@ -872,19 +872,48 @@ body {
 		right: 0;
 		bottom: calc(56px + var(--safe-bottom));
 		height: 3px;
-		overflow: hidden;
 		background: #ffffff40;
-		pointer-events: none;
+		pointer-events: auto;
+		cursor: pointer;
+		touch-action: none;
+		-webkit-user-select: none;
+		user-select: none;
+
+		/* Larger hit target above the thin bar. */
+		&::before {
+			content: "";
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: -6px;
+			height: 22px;
+		}
 
 		&::after {
 			content: "";
 			display: block;
+			position: relative;
+			z-index: 1;
 			width: var(--progress, 0%);
 			height: 100%;
 			background: #fff;
 			border-radius: 0 3px 3px 0;
 			box-shadow: 0 0 5px #0008;
 			transition: width 0.12s linear;
+			pointer-events: none;
+		}
+
+		&[data-scrubbing] {
+			height: 5px;
+
+			&::after {
+				transition: none;
+			}
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--tt-splash);
+			outline-offset: 3px;
 		}
 	}
 
@@ -1724,19 +1753,13 @@ radio-picker {
 
 	.captionPreview {
 		margin: 4px 0 14px;
-		padding: 22px 16px 16px;
+		padding: 20px 16px;
 		border-radius: 16px;
 		border: 1px solid var(--tt-line);
-		background:
-			radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--tt-razzmatazz) 18%, transparent), transparent 42%),
-			radial-gradient(circle at 78% 80%, color-mix(in srgb, var(--tt-splash) 14%, transparent), transparent 40%),
-			#111;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		min-height: 7.5rem;
+		background: #111;
+		display: grid;
+		place-items: center;
+		min-height: 5.5rem;
 		overflow: hidden;
 		text-align: center;
 	}
@@ -1744,9 +1767,9 @@ radio-picker {
 	.captionPreviewWord {
 		display: block;
 		max-width: 100%;
-		font-size: calc(clamp(1.85rem, 7.2vw, 3.4rem) * var(--caption-size, 1));
+		font-size: calc(clamp(1.35rem, 5vw, 2.4rem) * var(--caption-size, 1));
 		font-weight: 900;
-		line-height: 1.05;
+		line-height: 1.15;
 		letter-spacing: -0.025em;
 		color: #fff;
 		overflow-wrap: anywhere;
@@ -1757,14 +1780,6 @@ radio-picker {
 			0 4px 8px #000c,
 			0 0 22px #000b;
 		transition: font-size 0.12s ease-out;
-	}
-
-	.captionPreviewMeta {
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: hsla(0, 0%, 100%, 0.55);
 	}
 
 	.colorKey {
