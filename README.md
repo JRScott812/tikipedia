@@ -16,7 +16,7 @@ Settings → **Wikipedia language** switches the API host (`simple.wikipedia.org
 
 ## Config data
 
-Large static lists live under `[data/](data/)` so they can be edited without touching app logic:
+Large static lists live under [`data/`](data/) so they can be edited without touching app logic:
 
 
 | File                    | Contents                                             |
@@ -33,15 +33,22 @@ Regex patterns are stored as strings and compiled when the app loads.
 ## JavaScript modules
 
 `app.js` is a small ES-module entry point. Runtime features are separated under
-`[js/](js/)` (configuration, shared state, Wikimedia access, profiles, topics,
+[`js/`](js/) (configuration, shared state, Wikimedia access, profiles, topics,
 speech, media, feed, and UI); no bundler or build step is required.
+
+## Open a reel
+
+- **Search:** use the 🔍 control in the feed header (OpenSearch against your selected Wikipedia language).
+- **URL:** `/p/{lang}/Article_Title` — e.g. `/p/en/Albert_Einstein` or `/p/simple/Sun`. Spaces as underscores. Legacy `/p/Title` still works and uses your Settings language.
 
 ## Hosting
 
-This is a static site (no build step). Serve the repo root over HTTP(S), e.g.:
+This is a static site (no build step). Locally, use the SPA-aware server (same habit as `http.server`, but deep links work):
 
 ```sh
-python -m http.server 8000
+python serve.py 8000
 ```
 
-All asset paths are relative, so hosting under a subdirectory (`user.github.io/xikipedia/`) works without changes.
+Plain `python -m http.server` will 404 on refresh of `/p/Article`. GitHub Pages uses `404.html` for that.
+
+All asset paths are relative, so hosting under a subdirectory (`username.github.io/xikipedia/`) works without changes.
