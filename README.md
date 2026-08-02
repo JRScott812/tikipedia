@@ -1,7 +1,8 @@
 # Tikipedia
+
 Wikipedia as a TikTok-style social media feed
 
-# Try it: https://jrscott812.github.io/xikipedia
+# Try it: [https://jrscott812.github.io/xikipedia](https://jrscott812.github.io/xikipedia)
 
 ## About
 
@@ -15,22 +16,24 @@ Settings → **Wikipedia language** switches the API host (`simple.wikipedia.org
 
 ## Config data
 
-Large static lists live under [`data/`](data/) so they can be edited without touching app logic:
+Large static lists live under `[data/](data/)` so they can be edited without touching app logic:
 
-| File | Contents |
-|------|----------|
-| `data/languages.json` | Wikipedia language picker + range connectors for TTS |
-| `data/topics.json` | Topic groups, noise filters, onboarding categories |
-| `data/speech.json` | Month/ordinal/number words for date narration |
-| `data/captions.json` | Caption role colors and labels |
-| `data/junk-images.json` | Filename patterns to exclude from slideshows |
+
+| File                    | Contents                                             |
+| ----------------------- | ---------------------------------------------------- |
+| `data/languages.json`   | Wikipedia language picker + range connectors for TTS |
+| `data/topics.json`      | Topic groups, noise filters, onboarding categories   |
+| `data/speech.json`      | Month/ordinal/number words for date narration        |
+| `data/captions.json`    | Caption role colors and labels                       |
+| `data/junk-images.json` | Filename patterns to exclude from slideshows         |
+
 
 Regex patterns are stored as strings and compiled when the app loads.
 
 ## JavaScript modules
 
 `app.js` is a small ES-module entry point. Runtime features are separated under
-[`js/`](js/) (configuration, shared state, Wikimedia access, profiles, topics,
+`[js/](js/)` (configuration, shared state, Wikimedia access, profiles, topics,
 speech, media, feed, and UI); no bundler or build step is required.
 
 ## Hosting
@@ -42,5 +45,3 @@ python -m http.server 8000
 ```
 
 All asset paths are relative, so hosting under a subdirectory (`user.github.io/xikipedia/`) works without changes.
-
-The optional `process_data.py` dump pipeline and `smoldata.json*` files are unused by this live branch; they remain in the repo for the dump-based editions.
