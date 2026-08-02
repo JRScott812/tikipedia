@@ -2,7 +2,7 @@
 
 Wikipedia as a TikTok-style social media feed — React + TypeScript (v3).
 
-# Try it: [https://jrscott812.github.io/xikipedia](https://jrscott812.github.io/xikipedia)
+# Try it: [https://jrscott812.github.io/tikipedia](https://jrscott812.github.io/tikipedia)
 
 ## About
 
@@ -21,7 +21,7 @@ Recommendations (likes, watch history, category scores) stay on your device in `
 | --------------------------------- | -------------------------------------------------------------------------------------- |
 | `npm run dev` / `start` / `run`   | Vite development server                                                                |
 | `npm run build`                   | Typecheck + production build (writes `dist/`, including `404.html` for SPA deep links) |
-| `npm run preview` / `preview:ci`  | Serve the production build locally (`preview:ci` binds `127.0.0.1:4173` for LHCI)      |
+| `npm run preview`                 | Serve the production build on the host/port in `site.config.json`                      |
 | `npm test`                        | Unit / component tests (Vitest)                                                        |
 | `npm run test:watch`              | Vitest watch mode                                                                      |
 | `npm run test:e2e`                | Playwright browser tests                                                               |
@@ -38,7 +38,9 @@ npm ci
 npm run dev
 ```
 
-The app is built for GitHub Pages under `/xikipedia/` by default (`VITE_BASE`). For a root deploy, set `VITE_BASE=/`.
+[`site.config.json`](site.config.json) is the single source of truth for the deployed origin/base and the preview host/port. Vite, Playwright, Lighthouse CI, and `src/lib/site.ts` all read it, so changing the base path or preview port is a one-line edit.
+
+The app is built for GitHub Pages under that base by default. Override per-build with `VITE_BASE`; for a root deploy, set `VITE_BASE=/`.
 
 ## Architecture
 
@@ -58,7 +60,7 @@ The app is built for GitHub Pages under `/xikipedia/` by default (`VITE_BASE`). 
 
 - GitHub Actions **CI** runs `npm run verify` on pushes and pull requests (including Lighthouse CI; reports upload as the `lighthouse-reports` artifact).
 - Lighthouse config lives in [`lighthouserc.cjs`](lighthouserc.cjs) — asserts a11y/SEO floors, warns on performance for the SPA + live Wikimedia feed.
-- **Deploy** builds with `VITE_BASE=/xikipedia/` and publishes `dist/` to GitHub Pages.
+- **Deploy** builds with `VITE_BASE=/tikipedia/` and publishes `dist/` to GitHub Pages. Requires **Settings → Pages → Source: GitHub Actions**; the legacy "deploy from a branch" mode serves unbuilt source and breaks the app.
 - Production deep-link refreshes use `dist/404.html` (copy of `index.html`) plus the service worker navigation fallback.
 - [`public/robots.txt`](public/robots.txt) and [`public/sitemap.xml`](public/sitemap.xml) ship with the build (app shell routes; article deep links are allowed but not enumerated).
 - Link previews use Open Graph / Twitter tags in [`index.html`](index.html) plus [`public/og-image.png`](public/og-image.png); the client updates title/description/image while browsing posts.

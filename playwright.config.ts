@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import site from "./site.config.json" with { type: "json" };
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:4173/xikipedia/";
+const previewURL = `http://${site.previewHost}:${site.previewPort}${site.base}`;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || previewURL;
 
 export default defineConfig({
 	testDir: "e2e",
@@ -14,14 +16,10 @@ export default defineConfig({
 		trace: "on-first-retry"
 	},
 	webServer: {
-		command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173",
+		command: "npm run build && npm run preview",
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
-		timeout: 180_000,
-		env: {
-			...process.env,
-			VITE_BASE: "/xikipedia/"
-		}
+		timeout: 180_000
 	},
 	projects: [
 		{

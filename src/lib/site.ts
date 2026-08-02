@@ -1,6 +1,8 @@
+import site from "../../site.config.json" with { type: "json" };
+
 /** Canonical production origin (GitHub Pages project site). */
-export const SITE_ORIGIN = "https://jrscott812.github.io";
-export const SITE_PATH = "/xikipedia/";
+export const SITE_ORIGIN = site.origin;
+export const SITE_PATH = site.base;
 export const SITE_URL = `${SITE_ORIGIN}${SITE_PATH}`;
 export const SITE_NAME = "Tikipedia";
 export const SITE_TITLE = "Tikipedia — Wikipedia Shorts";

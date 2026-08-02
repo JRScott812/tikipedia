@@ -4,6 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { copyFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import pkg from "./package.json" with { type: "json" };
+import site from "./site.config.json" with { type: "json" };
 
 /** Copy index.html → 404.html so GitHub Pages SPA deep links work. */
 function spaFallback404() {
@@ -18,14 +19,22 @@ function spaFallback404() {
 }
 
 export default defineConfig(({ command }) => {
-	// Local `vite` (dev) defaults to `/`. Builds and `vite preview` use `/xikipedia/`
-	// so preview matches the GitHub Pages artifact (override with VITE_BASE).
+	// Local `vite` (dev) defaults to `/`. Builds and `vite preview` use the deployed
+	// base so preview matches the GitHub Pages artifact (override with VITE_BASE).
 	const isPreview = process.argv.includes("preview");
 	const base =
-		process.env.VITE_BASE || (command === "build" || isPreview ? "/xikipedia/" : "/");
+		process.env.VITE_BASE || (command === "build" || isPreview ? site.base : "/");
 
 	return {
 		base,
+		// Pinned so Playwright and Lighthouse can address the preview server by an
+		// exact URL. `strictPort` makes a busy port fail loudly instead of silently
+		// moving to 4174, which would leave those pollers aimed at nothing.
+		preview: {
+			host: site.previewHost,
+			port: site.previewPort,
+			strictPort: true
+		},
 		define: {
 			__APP_VERSION__: JSON.stringify(pkg.version)
 		},

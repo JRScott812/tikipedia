@@ -13,7 +13,7 @@ import type {
 const WIKI_CACHE_MAX = 200;
 const WIKI_MAX_CONCURRENT = 2;
 const WIKI_USER_AGENT =
-	"Tikipedia/3.0 (https://github.com/JRScott812/xikipedia; live-feed)";
+	"Tikipedia/3.0 (https://github.com/JRScott812/tikipedia; live-feed)";
 
 const wikiQueryCache = new Map<string, Promise<unknown>>();
 const pageCache = new Map<number | string, Post>();

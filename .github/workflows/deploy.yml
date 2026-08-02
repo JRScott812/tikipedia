@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
     push:
-        branches: [main, master]
+        branches: ["React-and-TS-API-Version"]
     workflow_dispatch:
 
 permissions:
@@ -31,7 +31,7 @@ jobs:
             - name: Build
               run: npm run build
               env:
-                  VITE_BASE: /xikipedia/
+                  VITE_BASE: /tikipedia/
 
             - name: Upload Pages artifact
               uses: actions/upload-pages-artifact@v3

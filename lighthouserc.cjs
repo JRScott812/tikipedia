@@ -6,18 +6,17 @@
  * (CI already installs Chromium via `npx playwright install`).
  */
 const { chromium } = require("playwright");
+const site = require("./site.config.json");
+
+const previewURL = `http://${site.previewHost}:${site.previewPort}${site.base}`;
 
 module.exports = {
 	ci: {
 		collect: {
 			chromePath: chromium.executablePath(),
-			startServerCommand: "npm run preview:ci",
+			startServerCommand: "npm run preview",
 			startServerReadyPattern: "Local:",
-			url: [
-				"http://127.0.0.1:4173/xikipedia/",
-				"http://127.0.0.1:4173/xikipedia/about",
-				"http://127.0.0.1:4173/xikipedia/settings"
-			],
+			url: [previewURL, `${previewURL}about`, `${previewURL}settings`],
 			numberOfRuns: process.env.CI ? 2 : 1,
 			settings: {
 				preset: "desktop",

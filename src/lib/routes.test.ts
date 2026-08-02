@@ -32,9 +32,9 @@ describe("postPathForRoute", () => {
 				{ lang: "en", slug: "Albert_Einstein" },
 				langs,
 				"simple",
-				"/xikipedia/"
+				"/tikipedia/"
 			)
-		).toBe("/xikipedia/p/en/Albert_Einstein");
+		).toBe("/tikipedia/p/en/Albert_Einstein");
 	});
 });
 
@@ -43,12 +43,12 @@ describe("readPostRouteFromLocation", () => {
 		const route = readPostRouteFromLocation(
 			langs,
 			{
-				pathname: "/xikipedia/p/en/Albert_Einstein",
+				pathname: "/tikipedia/p/en/Albert_Einstein",
 				search: "",
 				hash: "",
 				origin: "https://example.com"
 			},
-			"/xikipedia/"
+			"/tikipedia/"
 		);
 		expect(route).toEqual({ lang: "en", slug: "Albert_Einstein" });
 	});
@@ -57,12 +57,12 @@ describe("readPostRouteFromLocation", () => {
 		const route = readPostRouteFromLocation(
 			langs,
 			{
-				pathname: "/xikipedia/p/Sun",
+				pathname: "/tikipedia/p/Sun",
 				search: "",
 				hash: "",
 				origin: "https://example.com"
 			},
-			"/xikipedia/"
+			"/tikipedia/"
 		);
 		expect(route).toEqual({ lang: null, slug: "Sun" });
 	});
@@ -71,12 +71,12 @@ describe("readPostRouteFromLocation", () => {
 		const route = readPostRouteFromLocation(
 			langs,
 			{
-				pathname: "/xikipedia/",
+				pathname: "/tikipedia/",
 				search: "?p=Albert_Einstein&lang=en",
 				hash: "",
 				origin: "https://example.com"
 			},
-			"/xikipedia/"
+			"/tikipedia/"
 		);
 		expect(route.slug).toBe("Albert_Einstein");
 		expect(route.lang).toBe("en");
@@ -85,16 +85,16 @@ describe("readPostRouteFromLocation", () => {
 
 describe("app pages", () => {
 	it("builds and reads app page paths", () => {
-		expect(appPagePath("settings", "/xikipedia/")).toBe("/xikipedia/settings");
+		expect(appPagePath("settings", "/tikipedia/")).toBe("/tikipedia/settings");
 		expect(
 			readAppPageFromLocation(
 				{
-					pathname: "/xikipedia/settings",
+					pathname: "/tikipedia/settings",
 					search: "",
 					hash: "",
 					origin: "https://example.com"
 				},
-				"/xikipedia/"
+				"/tikipedia/"
 			)
 		).toBe("settings");
 	});
