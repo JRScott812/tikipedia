@@ -3,6 +3,9 @@
 	"private": true,
 	"version": "3.0.0",
 	"type": "module",
+	"engines": {
+		"node": "^22"
+	},
 	"description": "Tikipedia — Wikipedia as narrated short-form videos",
 	"scripts": {
 		"dev": "vite",
@@ -20,7 +23,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"typecheck": "tsc -b --pretty false",
-		"verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run test:e2e && npm run test:lighthouse"
+		"verify": "node scripts/verify.mjs"
 	},
 	"dependencies": {
 		"react": "^19.2.8",
