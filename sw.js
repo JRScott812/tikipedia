@@ -1,109 +1,75 @@
-const SW_VERSION = '1.1.7';
+const SW_VERSION = '2.0.10';
 
 self.addEventListener('install', () => {
-  self.skipWaiting();
+	self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+	event.waitUntil((async () => {
+		// Drop dump-era caches left over from older builds.
+		await caches.delete("smoldata");
+		await self.clients.claim();
+	})());
 });
 
 self.addEventListener("fetch", (event) => {
-  const filename = new URL(event.request.url).pathname.split("/").at(-1);
-  if (filename == "clearHtml")
-    return event.respondWith((async () => {
-      await caches.delete("html");
-      return new Response("cleared", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
-    })());
-  if (filename == "swVer")
-    return event.respondWith((()=>new Response(SW_VERSION, {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      }))());
-  const SMOLDATA_FILES = ["smoldata.json", "smoldata.json.gz", "smoldata.json.br"];
-  if (!["", "index.html", "styles.css", "app.js", "app.webmanifest", "favicon.ico", "favicon-48.png", "favicon-256.png", ...SMOLDATA_FILES].includes(filename))
-    return;
-  event.respondWith((async () => {
-    const request = event.request;
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse)
-      return cachedResponse;
-    const isSmolData = SMOLDATA_FILES.includes(filename);
-    // todo: delete after verifying the new one downloaded
-    if (isSmolData)
-      await caches.delete("smoldata");
-    const cache = await caches.open(isSmolData ? "smoldata" : "html");
-    try {
-      const networkResponse = await fetch(request);
-      // Don't cache missing/error responses (e.g. smoldata.json 404 on GitHub Pages)
-      if (!networkResponse.ok)
-        return networkResponse;
-      // Cache a clone; return a progress-wrapped body to the page (don't discard it)
-      const responseForCache = networkResponse.clone();
-      const responseForClient = isSmolData
-        ? progressMonitor(event.clientId, networkResponse)
-        : networkResponse;
-      await cache.put(request, responseForCache);
-      return responseForClient;
-    } catch (error) {
-      return new Response("Network error happened", {
-        status: 408,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-  })());
+	const url = new URL(event.request.url);
+	const filename = url.pathname.split("/").at(-1);
+	// SPA deep links: /p/Article_Title and nav pages → app shell
+	if (event.request.mode === "navigate" && /\/(p\/|profiles|stats|settings|about|following)/.test(url.pathname)) {
+		return event.respondWith((async () => {
+			const shell = new URL("index.html", self.registration.scope);
+			const cached = await caches.match(shell) || await caches.match("./index.html");
+			if (cached) return cached;
+			return fetch(shell);
+		})());
+	}
+	// Old clients may still request removed dump / PNG icons.
+	if (filename.startsWith("smoldata.json"))
+		return event.respondWith(new Response("Gone", { status: 410 }));
+	if (filename === "favicon.ico" || /^favicon-\d+\.png$/.test(filename))
+		return event.respondWith(Response.redirect(new URL("favicon.svg", event.request.url).href, 302));
+	if (filename == "clearHtml")
+		return event.respondWith((async () => {
+			await caches.delete("html");
+			await caches.delete("smoldata");
+			return new Response("cleared", {
+				status: 200,
+				headers: { "Content-Type": "text/plain" },
+			});
+		})());
+	if (filename == "swVer")
+		return event.respondWith((() => new Response(SW_VERSION, {
+			status: 200,
+			headers: { "Content-Type": "text/plain" },
+		}))());
+	// Shell assets + local JSON config. Article content comes live from Wikipedia.
+	const SHELL_FILES = [
+		"", "index.html", "404.html", "styles.css", "app.js", "app.webmanifest",
+		"path.js", "dom.js", "config.js", "state.js", "wiki.js", "profile.js", "topics.js",
+		"speech.js", "media.js", "feed.js", "routes.js", "ui.js",
+		"favicon.svg", "version.json",
+		"languages.json", "topics.json", "speech.json", "captions.json", "junk-images.json",
+	];
+	if (!SHELL_FILES.includes(filename))
+		return;
+	event.respondWith((async () => {
+		const request = event.request;
+		const cachedResponse = await caches.match(request);
+		if (cachedResponse)
+			return cachedResponse;
+		const cache = await caches.open("html");
+		try {
+			const networkResponse = await fetch(request);
+			if (!networkResponse.ok)
+				return networkResponse;
+			await cache.put(request, networkResponse.clone());
+			return networkResponse;
+		} catch (error) {
+			return new Response("Network error happened", {
+				status: 408,
+				headers: { "Content-Type": "text/plain" },
+			});
+		}
+	})());
 });
-
-
-// based on https://github.com/anthumchris/fetch-progress-indicators/blob/master/sw-basic/sw-simple.js
-function progressMonitor(clientId, response) {
-  if (!response.body) {
-    console.warn("ReadableStream is not yet supported in this browser.  See https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream")
-    return response;
-  }
-  if (!response.ok) {
-    // HTTP error code response
-    return response;
-  }
-
-  let loaded = 0;
-  const reader = response.body.getReader();
-
-  return new Response(
-    new ReadableStream({
-      start(controller) {        
-        // get client to post message. Awaiting resolution first read() progress
-        // is sent for progress indicator accuracy
-        let client;
-        clients.get(clientId).then(c => {
-          client = c;
-          read();
-        });
-
-        function read() {
-          reader.read().then(({done, value}) => {
-            if (done) {
-              controller.close();
-              return;
-            }
-
-            controller.enqueue(value);
-            loaded += value.byteLength;
-            if (client)
-              client.postMessage({event:"downloadProgress",data:loaded})
-            read();
-          })
-          .catch(error => {
-            // error only typically occurs if network fails mid-download
-            console.error('error in read()', error);
-            controller.error(error);
-          });
-        }
-      },
-
-      // Firefox excutes this on page stop, Chrome does not
-      cancel(reason) {
-        console.log('cancel()', reason);
-      }
-    })
-  )
-}
