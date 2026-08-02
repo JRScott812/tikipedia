@@ -1,4 +1,4 @@
-const SW_VERSION = '2.0.10';
+const SW_VERSION = '2.0.11';
 
 self.addEventListener('install', () => {
 	self.skipWaiting();
@@ -27,8 +27,8 @@ self.addEventListener("fetch", (event) => {
 	// Old clients may still request removed dump / PNG icons.
 	if (filename.startsWith("smoldata.json"))
 		return event.respondWith(new Response("Gone", { status: 410 }));
-	if (filename === "favicon.ico" || /^favicon-\d+\.png$/.test(filename))
-		return event.respondWith(Response.redirect(new URL("favicon.svg", event.request.url).href, 302));
+	if (filename === "favicon.ico" || filename === "favicon.svg" || /^favicon-\d+\.png$/.test(filename))
+		return event.respondWith(Response.redirect(new URL("icons/favicon.svg", self.registration.scope).href, 302));
 	if (filename == "clearHtml")
 		return event.respondWith((async () => {
 			await caches.delete("html");
@@ -48,7 +48,10 @@ self.addEventListener("fetch", (event) => {
 		"", "index.html", "404.html", "styles.css", "app.js", "app.webmanifest",
 		"path.js", "dom.js", "config.js", "state.js", "wiki.js", "profile.js", "topics.js",
 		"speech.js", "media.js", "feed.js", "routes.js", "ui.js",
-		"favicon.svg", "version.json",
+		"favicon.svg", "home.svg", "user.svg", "chart.svg", "settings.svg", "download.svg",
+		"heart.svg", "heart-fill.svg", "dislike.svg", "share.svg", "volume.svg", "volume-mute.svg",
+		"more.svg", "play.svg", "pause.svg", "fast-forward.svg",
+		"version.json",
 		"languages.json", "topics.json", "speech.json", "captions.json", "junk-images.json",
 	];
 	if (!SHELL_FILES.includes(filename))

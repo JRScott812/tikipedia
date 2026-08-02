@@ -301,14 +301,14 @@ state.setPausedUi = function setPausedUi(postEl, paused) {
 		postEl.dataset.paused = "1";
 		if (icon) {
 			delete icon.dataset.flash;
-			icon.textContent = "⏸️";
+			state.setIconImg(icon, "pause", "overlayIcon");
 		}
 		return;
 	}
 	delete postEl.dataset.paused;
 	if (!icon || !wasPaused) return;
 	// Brief play-glyph flash so resuming gets the same feedback as pausing.
-	icon.textContent = "▶️";
+	state.setIconImg(icon, "play", "overlayIcon");
 	delete icon.dataset.flash;
 	void icon.offsetWidth;
 	icon.dataset.flash = "1";
@@ -422,6 +422,7 @@ state.setMuted = function setMuted(muted) {
 		if (muted) btn.dataset.muted = "1";
 		else delete btn.dataset.muted;
 		if (btn._actionLabel) btn._actionLabel.textContent = muted ? "Muted" : "Sound";
+		state.setIconImg(btn, muted ? "volume-mute" : "volume");
 	});
 	if (!state.activePostEl || !state.activePostData || state.playbackPaused) return;
 	state.speakFrom(state.activePostEl, state.activePostData, state.captionIndex);

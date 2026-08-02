@@ -29,8 +29,8 @@
 	<meta property="og:locale" content="en-us">
 	<meta property="og:type" content="website">
 	<meta content="#000000" name="theme-color" />
-	<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
-	<link rel="apple-touch-icon" href="favicon.svg" />
+	<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" sizes="any" />
+	<link rel="apple-touch-icon" href="icons/favicon.svg" />
 	<link rel="manifest" href="app.webmanifest" />
 	<link rel="stylesheet" href="styles.css" />
 </head>
@@ -56,16 +56,22 @@
 		</p>
 	</section>
 	<nav class="bottomNav" aria-label="Main">
-		<a href="./" aria-label="Tikipedia home"><span class="logo">📚</span></a>
-		<button type="button" class="homeNav active" data-nav="home" data-icon="🏠"
-			onclick="showForYouPage(); activePostEl?.scrollIntoView({behavior:'smooth'})">Home</button>
-		<button type="button" data-nav="profiles" data-icon="👤" onclick="showProfilesPage()">Profiles</button>
-		<button type="button" data-nav="stats" data-icon="📊" onclick="showStatsPage()">Stats</button>
-		<button type="button" data-nav="settings" data-icon="⚙️" onclick="showSettingsPage()">Settings</button>
-		<button type="button" data-icon="⬇️" id="install" class="hidden">Install</button>
+		<a href="./" aria-label="Tikipedia home"><img class="logo" src="icons/favicon.svg" alt="Tikipedia"></a>
+		<button type="button" class="homeNav active" data-nav="home"
+			onclick="showForYouPage(); activePostEl?.scrollIntoView({behavior:'smooth'})"><img class="navIcon"
+				src="icons/home.svg" alt="">Home</button>
+		<button type="button" data-nav="profiles" onclick="showProfilesPage()"><img class="navIcon"
+				src="icons/user.svg" alt="">Profiles</button>
+		<button type="button" data-nav="stats" onclick="showStatsPage()"><img class="navIcon" src="icons/chart.svg"
+				alt="">Stats</button>
+		<button type="button" data-nav="settings" onclick="showSettingsPage()"><img class="navIcon"
+				src="icons/settings.svg" alt="">Settings</button>
+		<button type="button" id="install" class="hidden"><img class="navIcon" src="icons/download.svg"
+				alt="">Install</button>
 	</nav>
 	<div class="posts" id="shortsFeed"></div>
-	<button type="button" id="tapToPlay" aria-label="Tap to play audio"><span>▶️ Tap to play</span></button>
+	<button type="button" id="tapToPlay" aria-label="Tap to play audio"><span><img class="tapPlayIcon"
+				src="icons/play.svg" alt="">Tap to play</span></button>
 	<dialog id="descriptionSheet" closedby=any>
 		<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
 			<h2 id="descTitle"></h2>

@@ -24,6 +24,7 @@ state.clearLike = function clearLike(postEl, post) {
 	}
 	likeBtn.setAttribute("aria-label", "Like");
 	if (likeBtn._actionLabel) likeBtn._actionLabel.textContent = "Like";
+	state.setIconImg(likeBtn, "heart");
 	return true;
 }
 
@@ -56,6 +57,7 @@ state.likePost = function likePost(postEl, post, likeBtn, clientX, clientY) {
 	state.postsWithoutLike = 0;
 	likeBtn.setAttribute("aria-label", "Unlike");
 	if (likeBtn._actionLabel) likeBtn._actionLabel.textContent = "Liked";
+	state.setIconImg(likeBtn, "heart-fill");
 	setTimeout(state.saveProfile, 100);
 	if (clientX != null && clientY != null) {
 		const rect = postEl.getBoundingClientRect();
@@ -63,6 +65,7 @@ state.likePost = function likePost(postEl, post, likeBtn, clientX, clientY) {
 		burst.className = "heartBurst";
 		burst.style.left = `${clientX - rect.left}px`;
 		burst.style.top = `${clientY - rect.top}px`;
+		burst.appendChild(state.makeIconImg("heart-fill", "heartBurstIcon"));
 		postEl.appendChild(burst);
 		setTimeout(() => burst.remove(), 700);
 	}
@@ -143,14 +146,14 @@ state.buildPostElement = function buildPostElement(post) {
 
 	const speedBadge = document.createElement("div");
 	speedBadge.className = "speedBadge";
-	speedBadge.textContent = "⏩";
 	speedBadge.setAttribute("aria-hidden", "true");
+	speedBadge.appendChild(state.makeIconImg("fast-forward", "overlayIcon"));
 	postDiv.appendChild(speedBadge);
 
 	const pauseIcon = document.createElement("div");
 	pauseIcon.className = "pauseIcon";
 	pauseIcon.setAttribute("aria-hidden", "true");
-	pauseIcon.textContent = "⏸️";
+	pauseIcon.appendChild(state.makeIconImg("pause", "overlayIcon"));
 	pauseIcon.addEventListener("animationend", () => delete pauseIcon.dataset.flash);
 	postDiv.appendChild(pauseIcon);
 
@@ -210,10 +213,12 @@ state.buildPostElement = function buildPostElement(post) {
 	likeBtn.type = "button";
 	likeBtn.className = "iconBtn likeBtn";
 	likeBtn.setAttribute("aria-label", "Like");
-	if (state.likedPosts.includes(post.id)) {
+	const liked = state.likedPosts.includes(post.id);
+	if (liked) {
 		likeBtn.dataset.liked = "1";
 		likeBtn.setAttribute("aria-label", "Unlike");
 	}
+	likeBtn.appendChild(state.makeIconImg(liked ? "heart-fill" : "heart"));
 	likeBtn.onclick = (e) => {
 		e.stopPropagation();
 		state.likePost(postDiv, post, likeBtn, e.clientX, e.clientY);
@@ -226,6 +231,7 @@ state.buildPostElement = function buildPostElement(post) {
 		dislikeBtn.dataset.disliked = "1";
 		dislikeBtn.setAttribute("aria-label", "Remove dislike");
 	}
+	dislikeBtn.appendChild(state.makeIconImg("dislike"));
 	dislikeBtn.onclick = (e) => {
 		e.stopPropagation();
 		state.dislikePost(postDiv, post, dislikeBtn);
@@ -234,6 +240,7 @@ state.buildPostElement = function buildPostElement(post) {
 	shareBtn.type = "button";
 	shareBtn.className = "iconBtn shareBtn";
 	shareBtn.setAttribute("aria-label", "Share article");
+	shareBtn.appendChild(state.makeIconImg("share"));
 	shareBtn.onclick = (e) => {
 		e.stopPropagation();
 		state.shareArticle(post, shareBtn);
@@ -243,6 +250,7 @@ state.buildPostElement = function buildPostElement(post) {
 	muteBtn.className = "iconBtn muteBtn";
 	muteBtn.setAttribute("aria-label", "Mute");
 	if (state.settings.muted) muteBtn.dataset.muted = "1";
+	muteBtn.appendChild(state.makeIconImg(state.settings.muted ? "volume-mute" : "volume"));
 	muteBtn.onclick = (e) => {
 		e.stopPropagation();
 		state.setMuted(!state.settings.muted);
@@ -250,7 +258,8 @@ state.buildPostElement = function buildPostElement(post) {
 	const descBtn = document.createElement("button");
 	descBtn.type = "button";
 	descBtn.className = "iconBtn descBtn";
-	descBtn.innerText = "Description";
+	descBtn.setAttribute("aria-label", "Description");
+	descBtn.appendChild(state.makeIconImg("more"));
 	descBtn.onclick = (e) => {
 		e.stopPropagation();
 		state.openDescription(postDiv, post);

@@ -547,6 +547,20 @@ body {
 		filter: drop-shadow(0 2px 4px #000a);
 		transition: scale 0.15s, background 0.15s;
 		font-size: 0;
+		padding: 0;
+
+		.actionIcon {
+			width: 1.75rem;
+			height: 1.75rem;
+			display: block;
+			object-fit: contain;
+			pointer-events: none;
+		}
+
+		&.dislikeBtn[data-disliked] .actionIcon {
+			filter: drop-shadow(0 0 6px #ff5a5a);
+			scale: 1.08;
+		}
 
 		&:hover {
 			scale: 1.08;
@@ -559,49 +573,6 @@ body {
 		&:focus-visible {
 			outline: 2px solid var(--theme);
 			outline-offset: 2px;
-		}
-
-		&.likeBtn::after {
-			content: "🤍";
-			font-size: 1.75rem;
-		}
-
-		&.likeBtn[data-liked]::after {
-			content: "❤️";
-		}
-
-		&.dislikeBtn::after {
-			content: "👎";
-			font-size: 1.55rem;
-		}
-
-		&.dislikeBtn[data-disliked]::after {
-			content: "👎";
-			filter: drop-shadow(0 0 6px #ff5a5a);
-			scale: 1.08;
-		}
-
-		&.shareBtn::after {
-			content: "📤";
-			font-size: 1.45rem;
-		}
-
-		&.muteBtn::after {
-			content: "🔊";
-			font-size: 1.45rem;
-		}
-
-		&.muteBtn[data-muted]::after {
-			content: "🔇";
-			font-size: 1.25rem;
-		}
-
-		&.descBtn {
-			&::after {
-				content: "📄";
-				font-size: 1.7rem;
-				line-height: 1;
-			}
 		}
 	}
 
@@ -621,9 +592,14 @@ body {
 		border-radius: 50%;
 		display: grid;
 		place-items: center;
-		font-size: 2.4rem;
 		line-height: 1;
-		text-shadow: 0 2px 8px #0008;
+
+		.overlayIcon {
+			width: 2.4rem;
+			height: 2.4rem;
+			object-fit: contain;
+			filter: drop-shadow(0 2px 8px #0008);
+		}
 
 		&[data-show] {
 			opacity: 1;
@@ -653,9 +629,13 @@ body {
 		border-radius: 50%;
 		display: grid;
 		place-items: center;
-		font-size: 2.4rem;
-		line-height: 1;
-		text-shadow: 0 2px 8px #0008;
+
+		.overlayIcon {
+			width: 2.4rem;
+			height: 2.4rem;
+			object-fit: contain;
+			filter: drop-shadow(0 2px 8px #0008);
+		}
 	}
 
 	&[data-paused] .pauseIcon {
@@ -698,13 +678,13 @@ body {
 		translate: -50% -50%;
 		pointer-events: none;
 		animation: heartPop 0.7s ease-out forwards;
+		display: grid;
+		place-items: center;
 
-		&::after {
-			content: "❤️";
-			display: block;
-			font-size: 76px;
-			line-height: 96px;
-			text-align: center;
+		.heartBurstIcon {
+			width: 76px;
+			height: 76px;
+			object-fit: contain;
 			filter: drop-shadow(0 4px 12px #0008);
 		}
 	}
@@ -815,7 +795,16 @@ body {
 		display: grid;
 	}
 
+	.tapPlayIcon {
+		width: 1.35rem;
+		height: 1.35rem;
+		object-fit: contain;
+	}
+
 	span {
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
 		background: var(--theme);
 		padding: 16px 28px;
 		border-radius: 40px;
@@ -1088,14 +1077,11 @@ a[href] {
 			opacity: 1;
 		}
 
-		&::before {
+		.navIcon {
 			display: block;
-			content: attr(data-icon);
-			font-size: 1.45rem;
-			text-align: center;
-			width: 28px;
-			height: 28px;
-			line-height: 28px;
+			width: 1.45rem;
+			height: 1.45rem;
+			object-fit: contain;
 		}
 
 		&:hover {
@@ -1105,6 +1091,13 @@ a[href] {
 
 	a:has(.logo) {
 		display: none;
+	}
+
+	.logo {
+		display: block;
+		width: 32px;
+		height: 32px;
+		object-fit: contain;
 	}
 
 	@media (width >=800px) {
@@ -1128,10 +1121,6 @@ a[href] {
 
 		.logo {
 			margin-left: 4px;
-			display: block;
-			width: 32px;
-			font-size: 1.6rem;
-			text-align: center;
 		}
 
 		button:not(.hidden) {
@@ -1142,10 +1131,9 @@ a[href] {
 			font-size: 0;
 		}
 
-		button::before {
+		.navIcon {
 			width: 24px;
 			height: 24px;
-			translate: 0 -1px;
 		}
 	}
 
@@ -1155,10 +1143,7 @@ a[href] {
 		button:not(.hidden) {
 			padding: 8px 12px 8px 4px;
 			font-size: 1rem;
-		}
-
-		button::before {
-			margin: 0 12px 0 4px;
+			gap: 12px;
 		}
 	}
 }

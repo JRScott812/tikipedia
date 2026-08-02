@@ -1,6 +1,6 @@
 import { basePath } from "./path.js";
 import { state } from "./state.js";
-state.HTML_VERSION = "2.0.10";
+state.HTML_VERSION = "2.0.11";
 
 // Loaded from data/*.json before the app starts (see loadAppData).
 state.WIKI_LANGUAGES = [];
