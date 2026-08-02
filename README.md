@@ -1,26 +1,46 @@
-# xikipedia
+# Tikipedia
 Wikipedia as a TikTok-style social media feed
 
-# Try it: [xikipedia.org](https://jrscott812.github.io/xikipedia)
+# Try it: https://jrscott812.github.io/xikipedia
 
 ## About
 
-A modified version of [Xikipedia.org](https://xikipedia.org) but as a TikTok-style social feed, with videos.  All text & images come from the Wikipedia data dumps.  The voice uses the Text-to-Speech (TTS) from the browser/OS and can be changed in the settings.
+A modified version of [Xikipedia.org](https://xikipedia.org) as a TikTok-style social feed. This branch is **100% live**: article text, categories, links, and images are fetched on demand from the [MediaWiki Action API](https://www.mediawiki.org/wiki/API:Main_page) for the Wikipedia language you pick in Settings. Narration uses your browser/OS text-to-speech and auto-selects a matching voice when one is installed.
 
-Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.
+Recommendations (likes, watch history, category scores) stay on your device in `localStorage`, stored separately per language. An internet connection is required to load shorts.
 
-## Generating data
+## Languages
 
-To run Xikipedia, you need the .json file that contains the data required. This repo already has a file for the Simple Wikipedia included, but you can also make your own by replacing the files in the `process_data.py` file with your own [WikiMedia data dumps](https://dumps.wikimedia.org/).
+Settings → **Wikipedia language** switches the API host (`simple.wikipedia.org`, `en.wikipedia.org`, `es.wikipedia.org`, …). Changing language clears the in-memory feed cache and starts a new live queue for that edition.
+
+## Config data
+
+Large static lists live under [`data/`](data/) so they can be edited without touching app logic:
+
+| File | Contents |
+|------|----------|
+| `data/languages.json` | Wikipedia language picker + range connectors for TTS |
+| `data/topics.json` | Topic groups, noise filters, onboarding categories |
+| `data/speech.json` | Month/ordinal/number words for date narration |
+| `data/captions.json` | Caption role colors and labels |
+| `data/junk-images.json` | Filename patterns to exclude from slideshows |
+
+Regex patterns are stored as strings and compiled when the app loads.
+
+## JavaScript modules
+
+`app.js` is a small ES-module entry point. Runtime features are separated under
+[`js/`](js/) (configuration, shared state, Wikimedia access, profiles, topics,
+speech, media, feed, and UI); no bundler or build step is required.
 
 ## Hosting
 
-The app tries the dataset in this order and uses whichever the host has: `smoldata.json`, then `smoldata.json.gz`, then `smoldata.json.br`. The compressed ones are decompressed in the browser, so the archives are sniffed rather than trusted by extension — a host that sets `Content-Encoding` itself (like nginx serving `smoldata.json.br` as `smoldata.json`) still works.
-
-On static hosts such as GitHub Pages, the uncompressed 228MB `smoldata.json` can't be committed (over GitHub's file size limit) and browsers can't decode brotli via `DecompressionStream`, so `smoldata.json.gz` is what gets used. Regenerate it after changing the dataset:
+This is a static site (no build step). Serve the repo root over HTTP(S), e.g.:
 
 ```sh
-gzip -9 -k smoldata.json  # writes smoldata.json.gz
+python -m http.server 8000
 ```
 
-Then update `EXPECTED_GZ_SIZE` in `app.js` and `simple` in `version.json` to the new sizes. All paths are relative, so serving from a subdirectory (`user.github.io/xikipedia/`) works without changes.
+All asset paths are relative, so hosting under a subdirectory (`user.github.io/xikipedia/`) works without changes.
+
+The optional `process_data.py` dump pipeline and `smoldata.json*` files are unused by this live branch; they remain in the repo for the dump-based editions.
