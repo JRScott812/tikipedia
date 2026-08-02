@@ -1,0 +1,214 @@
+{
+	"defaultCategories": [
+		"nature",
+		"science",
+		"animals",
+		"anthropology",
+		"places",
+		"sociology",
+		"art",
+		"mathematics",
+		"games",
+		"technology",
+		"music",
+		"human sexuality"
+	],
+	"noise": [
+		"^living people$",
+		"^basic english",
+		"^given names$",
+		"^surnames$",
+		"^deaths from ",
+		"^year of (birth|death)",
+		"^\\d{1,4} (births|deaths)$",
+		"^people from ",
+		"^alumni of ",
+		"^members of the ",
+		"^recipients of ",
+		"^winners of ",
+		"^award[- ]winning ",
+		"^naturalized citizens",
+		"^english-speaking countries$",
+		"^french-speaking countries$",
+		"^spanish-speaking countries$",
+		"^commonwealth member states$",
+		"^european union member states$",
+		"^least developed countries$",
+		"^current monarchies$",
+		"^time people of the year$",
+		"^all-stub articles$",
+		"^articles needing",
+		"^wikipedia ",
+		"^redirects "
+	],
+	"groups": [
+		{
+			"id": "entertainment",
+			"label": "Film & TV",
+			"emoji": "🎬",
+			"wikiPage": "Film",
+			"accent": "#FF6B9D",
+			"patterns": [
+				"\\b(science fiction|sci-?fi|film|movie|cinema|television|tv show|tv series|actor|actress|screenwriter|director|producer|hollywood|sitcom|soap opera|anime|cartoon)\\b"
+			]
+		},
+		{
+			"id": "music",
+			"label": "Music",
+			"emoji": "🎵",
+			"wikiPage": "Music",
+			"accent": "#D4A5FF",
+			"patterns": [
+				"\\b(music|song|singer|songwriter|album|band|musician|composer|orchestra|jazz|rock|hip hop|rap|opera|grammy)\\b"
+			]
+		},
+		{
+			"id": "sports",
+			"label": "Sports & Games",
+			"emoji": "🏆",
+			"wikiPage": "Sport",
+			"accent": "#FFE566",
+			"patterns": [
+				"\\b(sport|olympic|football|soccer|baseball|basketball|tennis|cricket|hockey|golf|racing|athlete|championship|video game|board game|card game|chess)\\b"
+			]
+		},
+		{
+			"id": "science",
+			"label": "Science",
+			"emoji": "🔬",
+			"wikiPage": "Science",
+			"accent": "#7AD7FF",
+			"patterns": [
+				"\\b(science|physics|chemistry|biology|geology|astronomy|scientist|research|experiment|molecule|atom|element|evolution|genetics)\\b"
+			]
+		},
+		{
+			"id": "space",
+			"label": "Space",
+			"emoji": "🪐",
+			"wikiPage": "Outer space",
+			"accent": "#A5B4FC",
+			"patterns": [
+				"\\b(space|planet|galaxy|astronom|astronaut|nasa|solar system|constellation|nebula|cosmos)\\b"
+			]
+		},
+		{
+			"id": "tech",
+			"label": "Technology",
+			"emoji": "💻",
+			"wikiPage": "Technology",
+			"accent": "#5CFFB1",
+			"patterns": [
+				"\\b(technology|computer|software|internet|engineering|robot|electronics|programming|invention|telecommunication|ai\\b|artificial intelligence)\\b"
+			]
+		},
+		{
+			"id": "math",
+			"label": "Mathematics",
+			"emoji": "➗",
+			"wikiPage": "Mathematics",
+			"accent": "#FDBA74",
+			"patterns": [
+				"\\b(math|mathematics|geometry|algebra|number theory|statistics|calculus)\\b"
+			]
+		},
+		{
+			"id": "nature",
+			"label": "Nature & Animals",
+			"emoji": "🌿",
+			"wikiPage": "Nature",
+			"accent": "#86EFAC",
+			"patterns": [
+				"\\b(nature|animal|bird|fish|mammal|reptile|insect|wildlife|plant|tree|flower|forest|ocean|environment|ecology|dinosaur|species)\\b"
+			]
+		},
+		{
+			"id": "places",
+			"label": "Places",
+			"emoji": "🌍",
+			"wikiPage": "Geography",
+			"accent": "#38BDF8",
+			"patterns": [
+				"\\b(country|countries|city|cities|capital|geography|state|island|continent|region|province|municipality|settlement|landform|mountain|river|lake|sea|ocean|desert)\\b"
+			]
+		},
+		{
+			"id": "history",
+			"label": "History",
+			"emoji": "🏛️",
+			"wikiPage": "History",
+			"accent": "#FCD34D",
+			"patterns": [
+				"\\b(history|historical|ancient|century|empire|civilization|war|battle|revolution|medieval|prehistoric|archaeology)\\b"
+			]
+		},
+		{
+			"id": "arts",
+			"label": "Arts & Design",
+			"emoji": "🎨",
+			"wikiPage": "Art",
+			"accent": "#F9A8D4",
+			"patterns": [
+				"\\b(art|painting|painter|sculpture|artist|design|architecture|architect|photography|fashion|museum|gallery)\\b"
+			]
+		},
+		{
+			"id": "books",
+			"label": "Books & Language",
+			"emoji": "📚",
+			"wikiPage": "Literature",
+			"accent": "#C4B5FD",
+			"patterns": [
+				"\\b(book|literature|writer|author|novel|poem|poetry|language|linguistics|dictionary|encyclopedia|mythology|folklore)\\b"
+			]
+		},
+		{
+			"id": "food",
+			"label": "Food & Drink",
+			"emoji": "🍽️",
+			"wikiPage": "Food",
+			"accent": "#FDBA74",
+			"patterns": [
+				"\\b(food|drink|cooking|cuisine|recipe|dish|beverage|restaurant|fruit|vegetable|meat)\\b"
+			]
+		},
+		{
+			"id": "health",
+			"label": "Health & Body",
+			"emoji": "🩺",
+			"wikiPage": "Medicine",
+			"accent": "#FDA4AF",
+			"patterns": [
+				"\\b(medicine|medical|health|disease|hospital|anatomy|physiology|doctor|nurse|therapy|psychology|mental health)\\b"
+			]
+		},
+		{
+			"id": "society",
+			"label": "Society & Politics",
+			"emoji": "⚖️",
+			"wikiPage": "Culture",
+			"accent": "#93C5FD",
+			"patterns": [
+				"\\b(politic|government|law|legal|leader|president|prime minister|parliament|election|diplomacy|human rights|sociology|anthropology|culture|society|religion|christian|islam|muslim|judaism|jewish|hindu|buddhist|church|faith|philosophy|ethic)\\b"
+			]
+		},
+		{
+			"id": "people",
+			"label": "People",
+			"emoji": "👥",
+			"wikiPage": "Human",
+			"accent": "#F0ABFC",
+			"patterns": [
+				"\\b(people|person|biography|musician|politician|scientist|athlete|royalty|monarch|family|women|men|children)\\b"
+			]
+		},
+		{
+			"id": "other",
+			"label": "More interests",
+			"emoji": "✨",
+			"wikiPage": "Knowledge",
+			"accent": "#2cafff",
+			"patterns": []
+		}
+	]
+}

@@ -1,0 +1,6 @@
+# https://jrscott812.github.io/xikipedia/
+User-agent: *
+Allow: /
+
+# App shell routes (SPA). Article deep links under /p/ are also allowed.
+Sitemap: https://jrscott812.github.io/xikipedia/sitemap.xml

@@ -1,95 +1,73 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<!-- Build-time base only (never from location.pathname — avoids reflected XSS). -->
+		<base href="%BASE_URL%" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
 
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<script>
-		// Deep links live at /p/{lang}/Article_Title; keep asset URLs rooted at the app base.
-		(() => {
-			let path = location.pathname || "/";
-			const pAt = path.indexOf("/p/");
-			if (pAt >= 0) path = path.slice(0, pAt) || "/";
-			else path = path.replace(/\/(profiles|stats|settings|about|following)\/?$/, "/");
-			if (path.endsWith("index.html") || path.endsWith("404.html"))
-				path = path.replace(/[^/]+$/, "");
-			else if (!path.endsWith("/"))
-				path = path.replace(/\/[^/]*$/, "/") || "/";
-			if (!path.endsWith("/")) path += "/";
-			document.write(`<base href="${path}">`);
-		})();
-	</script>
-	<title>Tikipedia — Wikipedia Shorts</title>
-	<meta property="og:url" content="https://jrscott812.github.io/xikipedia">
-	<meta property="og:title" content="Tikipedia — Wikipedia Shorts">
-	<meta name="description"
-		content="Swipe through Wikipedia as narrated short-form videos with captions — live from Wikimedia, in multiple languages.">
-	<meta property="og:description"
-		content="Swipe through Wikipedia as narrated short-form videos with captions — live from Wikimedia, in multiple languages.">
-	<meta property="og:locale" content="en-us">
-	<meta property="og:type" content="website">
-	<meta content="#000000" name="theme-color" />
-	<link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any" />
-	<link rel="apple-touch-icon" href="favicon.svg" />
-	<link rel="manifest" href="app.webmanifest" />
-	<link rel="stylesheet" href="styles.css" />
-</head>
+		<title>Tikipedia — Wikipedia Shorts</title>
+		<meta
+			name="description"
+			content="Swipe through Wikipedia as narrated short-form videos with captions — live from Wikimedia, in multiple languages."
+		/>
+		<meta name="application-name" content="Tikipedia" />
+		<meta name="author" content="Tikipedia" />
+		<meta name="color-scheme" content="dark light" />
+		<meta name="theme-color" content="#000000" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Tikipedia" />
+		<link rel="canonical" href="https://jrscott812.github.io/xikipedia/" />
 
-<body>
-	<p id="loading">Loading...</p>
-	<header class="feedHeader" aria-label="Feed">
-		<span class="feedBrand" aria-label="Tikipedia"></span>
-		<div class="feedTabs" aria-label="Current feed">
-			<button type="button" class="feedTab followingTab" aria-controls="followingPage">Following</button>
-			<button type="button" class="feedTab forYouTab active" aria-controls="shortsFeed" aria-current="page">For
-				You</button>
-		</div>
-		<div class="feedSearch">
-			<button type="button" class="feedSearchToggle" aria-label="Search articles" aria-expanded="false"
-				aria-controls="feedSearchPanel">
-				<img class="feedSearchIcon" src="icons/search.svg" alt="">
-			</button>
-			<form id="feedSearchPanel" class="feedSearchPanel" role="search" hidden>
-				<label class="sr-only" for="feedSearchInput">Search Wikipedia articles</label>
-				<input id="feedSearchInput" class="feedSearchInput" type="search" name="q"
-					placeholder="Search or paste /p/en/Title…" autocomplete="off" enterkeyhint="search" />
-				<ul id="feedSearchResults" class="feedSearchResults" role="listbox" hidden></ul>
-				<p id="feedSearchStatus" class="feedSearchStatus" hidden></p>
-			</form>
-		</div>
-	</header>
-	<nav class="bottomNav" aria-label="Main">
-		<a href="./" aria-label="Tikipedia home"><img class="logo" src="favicon.svg" alt="Tikipedia"></a>
-		<button type="button" class="homeNav active" data-nav="home"
-			onclick="showForYouPage(); activePostEl?.scrollIntoView({behavior:'smooth'})"><img class="navIcon"
-				src="icons/home.svg" alt="">Home</button>
-		<button type="button" data-nav="profiles" onclick="showProfilesPage()"><img class="navIcon"
-				src="icons/user.svg" alt="">Profiles</button>
-		<button type="button" data-nav="stats" onclick="showStatsPage()"><img class="navIcon" src="icons/chart.svg"
-				alt="">Stats</button>
-		<button type="button" data-nav="settings" onclick="showSettingsPage()"><img class="navIcon"
-				src="icons/settings.svg" alt="">Settings</button>
-		<button type="button" id="install" class="hidden"><img class="navIcon" src="icons/download.svg"
-				alt="">Install</button>
-	</nav>
-	<div class="posts" id="shortsFeed"></div>
-	<button type="button" id="tapToPlay" aria-label="Tap to play audio"><span><img class="tapPlayIcon"
-				src="icons/play.svg" alt="">Tap to play</span></button>
-	<dialog id="descriptionSheet" closedby=any>
-		<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
-			<h2 id="descTitle"></h2>
-			<button type="button" class="closeButton closeDesc" aria-label="Close"
-				style="background:#0000;color:#FFF;border:none;font-size:1.2rem;cursor:pointer">❌</button>
-		</div>
-		<p class="descSummary" id="descSummary"></p>
-		<div class="descLinks" id="descLinks"></div>
-		<div class="descActions">
-			<button type="button" class="openArticle" id="descOpenArticle">📖 Open full article</button>
-			<button type="button" class="closeDesc">Close</button>
-		</div>
-	</dialog>
-	<div id="pageRoot"></div>
-	<script type="module" src="app.js"></script>
-</body>
+		<!-- Open Graph -->
+		<meta property="og:site_name" content="Tikipedia" />
+		<meta property="og:type" content="website" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:url" content="https://jrscott812.github.io/xikipedia/" />
+		<meta property="og:title" content="Tikipedia — Wikipedia Shorts" />
+		<meta
+			property="og:description"
+			content="Swipe through Wikipedia as narrated short-form videos with captions — live from Wikimedia, in multiple languages."
+		/>
+		<meta
+			property="og:image"
+			content="https://jrscott812.github.io/xikipedia/og-image.png"
+		/>
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content="1536" />
+		<meta property="og:image:height" content="1024" />
+		<meta
+			property="og:image:alt"
+			content="Tikipedia — Wikipedia Shorts: TikTok-style W logo on black"
+		/>
 
+		<!-- Twitter / X -->
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Tikipedia — Wikipedia Shorts" />
+		<meta
+			name="twitter:description"
+			content="Swipe through Wikipedia as narrated short-form videos with captions — live from Wikimedia, in multiple languages."
+		/>
+		<meta
+			name="twitter:image"
+			content="https://jrscott812.github.io/xikipedia/og-image.png"
+		/>
+		<meta
+			name="twitter:image:alt"
+			content="Tikipedia — Wikipedia Shorts: TikTok-style W logo on black"
+		/>
+
+		<link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" sizes="any" />
+		<link rel="apple-touch-icon" href="%BASE_URL%favicon.svg" />
+		<link rel="mask-icon" href="%BASE_URL%favicon.svg" color="#000000" />
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
 </html>
