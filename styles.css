@@ -244,6 +244,7 @@ body {
 			border-radius: 50%;
 			background: color-mix(in srgb, var(--topic-accent) 32%, #111);
 			font-size: 0.95rem;
+			line-height: 1;
 			box-shadow: 0 2px 7px #0006;
 
 			img {
@@ -251,6 +252,7 @@ body {
 				height: 100%;
 				display: block;
 				object-fit: cover;
+				background: #fff;
 			}
 		}
 

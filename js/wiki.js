@@ -70,6 +70,7 @@ state.clearLiveCaches = function clearLiveCaches() {
 	state.articleRepCache.clear();
 	state.templateMetaCache.clear();
 	state.topicIconCache.clear();
+	state.fileThumbUrlCache?.clear();
 	state.summaryLinkRefCache?.clear();
 	state.candidateQueue.length = 0;
 }

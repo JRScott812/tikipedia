@@ -14,6 +14,44 @@ state.commonsThumbUrl = function commonsThumbUrl(fileTitle, width = 720) {
 	return `https://commons.wikimedia.org/w/index.php?title=Special:Redirect/file/${encodeURIComponent(name)}&width=${width}`;
 }
 
+/** Resolve a File: thumb via the current wiki (then Commons), skipping non-images. */
+state.fileThumbUrlCache = new Map();
+state.resolveFileThumbUrl = async function resolveFileThumbUrl(fileTitle, width = 96, { lang } = {}) {
+	const name = state.normalizeFileTitle(fileTitle);
+	if (!name) return "";
+	if (/\.(webm|ogv|ogg|oga|mid|midi|pdf|djvu)$/i.test(name)) return "";
+	const wikiLang = lang || state.settings?.wikiLang || "simple";
+	const cacheKey = `${wikiLang}:${width}:${name.toLowerCase()}`;
+	if (state.fileThumbUrlCache.has(cacheKey))
+		return state.fileThumbUrlCache.get(cacheKey);
+
+	const promise = (async () => {
+		try {
+			const data = await state.wikiQuery({
+				action: "query",
+				redirects: 1,
+				titles: `File:${name.replace(/_/g, " ")}`,
+				prop: "imageinfo",
+				iiprop: "url|mime",
+				iiurlwidth: width,
+			}, { lang: wikiLang });
+			const page = Object.values(data?.query?.pages || {})[0];
+			const info = page?.imageinfo?.[0];
+			const mime = info?.mime || "";
+			if (info?.thumburl && (!mime || mime.startsWith("image/")))
+				return info.thumburl;
+			if (info?.url && mime.startsWith("image/"))
+				return info.url;
+		} catch {
+			/* fall through */
+		}
+		return state.commonsThumbUrl(name, width);
+	})();
+
+	state.fileThumbUrlCache.set(cacheKey, promise);
+	return promise;
+}
+
 state.isUsefulArticleImage = function isUsefulArticleImage(fileTitle, mime) {
 	if (!fileTitle) return false;
 	if (mime && !String(mime).startsWith("image/")) return false;

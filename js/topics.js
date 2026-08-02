@@ -72,18 +72,30 @@ state.applyAvatarRepresentation = function applyAvatarRepresentation(avatar, rep
 	avatar.dataset.repKind = rep.kind || "topic";
 	avatar.title = rep.label;
 	avatar.setAttribute("aria-label", rep.label);
+	const emoji = rep.emoji || "✨";
+	const token = (avatar._repToken || 0) + 1;
+	avatar._repToken = token;
 	avatar.replaceChildren();
+	avatar.textContent = emoji;
 	if (rep.image) {
 		const img = document.createElement("img");
-		img.src = state.commonsThumbUrl(rep.image, 96);
 		img.alt = "";
 		img.draggable = false;
+		img.referrerPolicy = "no-referrer";
+		img.decoding = "async";
 		img.onerror = () => {
-			avatar.textContent = rep.emoji || "✨";
+			if (avatar._repToken !== token) return;
+			avatar.replaceChildren();
+			avatar.textContent = emoji;
 		};
-		avatar.appendChild(img);
-	} else {
-		avatar.textContent = rep.emoji || "✨";
+		state.resolveFileThumbUrl(rep.image, 96).then(url => {
+			if (!url || avatar._repToken !== token) return;
+			img.onload = () => {
+				if (avatar._repToken !== token) return;
+				avatar.replaceChildren(img);
+			};
+			img.src = url;
+		});
 	}
 	if (sourceLine) {
 		const category = state.representationCategoryLabel(rep);
@@ -112,9 +124,21 @@ state.fetchTemplateMeta = async function fetchTemplateMeta(templateTitle) {
 	return promise;
 }
 
+state.cleanTemplateImageName = function cleanTemplateImageName(raw) {
+	if (!raw) return null;
+	let t = String(raw).trim();
+	if (!t || /\{\{/.test(t)) return null;
+	t = t.replace(/^\[\[/, "").replace(/\]\]$/, "");
+	t = t.split("|")[0].trim();
+	t = t.replace(/^(?:File|Image):/i, "").trim();
+	t = state.normalizeFileTitle(t);
+	if (!t || /\.(webm|ogv|ogg|oga|pdf|djvu)$/i.test(t)) return null;
+	return t;
+}
+
 state.parseStubTemplateWikitext = function parseStubTemplateWikitext(wt) {
 	if (!wt) return null;
-	const image = wt.match(/\|\s*image\s*=\s*([^\n|}]+)/i)?.[1]?.trim();
+	const image = state.cleanTemplateImageName(wt.match(/\|\s*image\s*=\s*([^\n|}]+)/i)?.[1]);
 	const subject = wt.match(/\|\s*subject\s*=\s*([^\n|}]+)/i)?.[1]?.trim();
 	if (!subject && !image) return null;
 	const group = state.groupForSubject(subject || "");
@@ -139,16 +163,18 @@ state.parseSeriesTemplateWikitext = function parseSeriesTemplateWikitext(wt) {
 		.replace(/<[^>]+>/g, "")
 		.trim();
 	const imageLine = wt.match(/\|\s*image\s*=\s*([^\n]+)/i)?.[1] || "";
-	const image = imageLine.match(/\[\[(?:File|Image):([^|\]]+)/i)?.[1]
+	const image = state.cleanTemplateImageName(
+		imageLine.match(/\[\[(?:File|Image):([^|\]]+)/i)?.[1]
 		|| imageLine.match(/(?:File|Image):([^\s|\]}]+)/i)?.[1]
-		|| null;
+		|| imageLine
+	);
 	if (!subject && !image) return null;
 	const group = state.groupForSubject(subject || "religion");
 	return {
 		kind: "series",
 		subject: subject || group.label,
 		label: subject ? `Part of a series on ${subject}` : "Part of a series",
-		image: image ? image.trim() : null,
+		image: image || null,
 		emoji: group.emoji,
 		accent: group.accent,
 		group,
@@ -283,24 +309,45 @@ state.getFollowedTopics = function getFollowedTopics(limit = 48) {
 // separate from articleImageCache and never appended to a short's .visual.
 state.topicIconCache = new Map();
 
+state.pageImageThumbFromQuery = function pageImageThumbFromQuery(data) {
+	const page = Object.values(data?.query?.pages || {})[0];
+	if (!page || page.missing != null) return null;
+	const source = page?.thumbnail?.source || "";
+	const file = page?.pageimage || "";
+	// Prefer real image thumbs; skip raw video files without a raster thumb.
+	if (!source) return null;
+	if (/\.(webm|ogv|ogg)$/i.test(file) && !/\/thumb\//.test(source))
+		return null;
+	return source;
+}
+
 state.fetchTopicIcon = function fetchTopicIcon(group) {
 	if (!group?.wikiPage) return Promise.resolve(null);
 	const cacheKey = `${state.settings.wikiLang}:${group.id}`;
 	if (state.topicIconCache.has(cacheKey)) return state.topicIconCache.get(cacheKey);
 	const promise = (async () => {
-		try {
+		const queryPage = async (lang) => {
 			const data = await state.wikiQuery({
 				action: "query",
 				redirects: 1,
 				prop: "pageimages",
+				piprop: "thumbnail|name",
 				pithumbsize: 128,
 				titles: group.wikiPage,
-			});
-			const page = Object.values(data?.query?.pages || {})[0];
-			return page?.thumbnail?.source || null;
+			}, { lang });
+			return state.pageImageThumbFromQuery(data);
+		};
+		try {
+			const local = await queryPage(state.settings.wikiLang);
+			if (local) return local;
+			// Topic labels are English wiki titles — fall back when the
+			// selected language edition has no lead image.
+			if (state.settings.wikiLang !== "en")
+				return await queryPage("en");
 		} catch {
 			return null;
 		}
+		return null;
 	})();
 	state.topicIconCache.set(cacheKey, promise);
 	return promise;
@@ -310,7 +357,7 @@ state.makeTopicIcon = function makeTopicIcon(group) {
 	const icon = document.createElement("span");
 	icon.className = "followingSectionIcon";
 	icon.setAttribute("aria-hidden", "true");
-	icon.textContent = group.emoji;
+	icon.textContent = group.emoji || "✨";
 	state.fetchTopicIcon(group).then(src => {
 		if (!src) return;
 		const img = document.createElement("img");
@@ -318,6 +365,11 @@ state.makeTopicIcon = function makeTopicIcon(group) {
 		img.alt = "";
 		img.loading = "lazy";
 		img.decoding = "async";
+		img.referrerPolicy = "no-referrer";
+		img.onerror = () => {
+			icon.replaceChildren();
+			icon.textContent = group.emoji || "✨";
+		};
 		img.onload = () => icon.replaceChildren(img);
 	});
 	return icon;
