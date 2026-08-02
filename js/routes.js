@@ -16,35 +16,97 @@ state.slugToTitle = function slugToTitle(slug) {
 	}
 };
 
-state.postPathForSlug = function postPathForSlug(slug) {
+state.isWikiLangCode = function isWikiLangCode(code) {
+	const c = String(code || "").toLowerCase();
+	if (!c) return false;
+	return (state.WIKI_LANGUAGES || []).some(l => l.code === c);
+};
+
+state.normalizeWikiLang = function normalizeWikiLang(code) {
+	const c = String(code || "").toLowerCase();
+	if (state.isWikiLangCode(c)) return c;
+	return state.settings?.wikiLang || "simple";
+};
+
+/** Canonical post path: /p/{lang}/{slug} */
+state.postPathForRoute = function postPathForRoute({ lang, slug } = {}) {
 	const base = state.BASE_PATH.endsWith("/") ? state.BASE_PATH : `${state.BASE_PATH}/`;
-	return `${base}p/${slug}`;
+	const l = state.normalizeWikiLang(lang || state.settings?.wikiLang);
+	const s = slug || "";
+	if (!s) return `${base}p/${l}/`;
+	return `${base}p/${l}/${s}`;
+};
+
+/** @deprecated use postPathForRoute — kept for call sites that only have a slug */
+state.postPathForSlug = function postPathForSlug(slug, lang) {
+	return state.postPathForRoute({ lang, slug });
 };
 
 state.postUrl = function postUrl(post) {
 	const slug = state.titleToSlug(post?.title);
 	if (!slug) return `${location.origin}${state.BASE_PATH}`;
-	return `${location.origin}${state.postPathForSlug(slug)}`;
+	const lang = post?.wikiLang || state.settings?.wikiLang;
+	return `${location.origin}${state.postPathForRoute({ lang, slug })}`;
 };
 
-/** Read a post slug from path (/p/…), hash (#/p/…), or ?p=. */
-state.readPostSlugFromLocation = function readPostSlugFromLocation() {
+/**
+ * Read post route from path (/p/{lang}/{slug} or legacy /p/{slug}),
+ * hash (#/p/…), or ?p= / ?lang=.
+ * @returns {{ lang: string|null, slug: string }}
+ */
+state.readPostRouteFromLocation = function readPostRouteFromLocation() {
 	const base = state.BASE_PATH.endsWith("/") ? state.BASE_PATH : `${state.BASE_PATH}/`;
 	const path = location.pathname || "";
 	const prefix = `${base}p/`;
+	const langParam = new URLSearchParams(location.search).get("lang");
+
+	const fromParts = (parts) => {
+		const segs = (parts || []).filter(Boolean);
+		if (!segs.length) return { lang: null, slug: "" };
+		if (segs.length >= 2 && state.isWikiLangCode(segs[0]))
+			return { lang: segs[0].toLowerCase(), slug: segs.slice(1).join("/") };
+		return { lang: null, slug: segs[0] };
+	};
+
 	if (path.startsWith(prefix)) {
 		const rest = path.slice(prefix.length).replace(/\/+$/, "");
-		if (rest) return rest.split("/")[0];
+		const route = fromParts(rest.split("/"));
+		if (route.slug) {
+			if (!route.lang && langParam && state.isWikiLangCode(langParam))
+				route.lang = langParam.toLowerCase();
+			return route;
+		}
 	}
 
 	const hash = (location.hash || "").replace(/^#\/?/, "");
-	const hashMatch = hash.match(/^(?:p\/)?(.+)$/);
-	if (hashMatch?.[1] && hashMatch[1] !== "p")
-		return hashMatch[1].split("/")[0];
+	const hashBody = hash.replace(/^p\//i, "");
+	if (hashBody && hashBody !== "p") {
+		const route = fromParts(hashBody.split("/"));
+		if (route.slug) {
+			if (!route.lang && langParam && state.isWikiLangCode(langParam))
+				route.lang = langParam.toLowerCase();
+			return route;
+		}
+	}
 
 	const q = new URLSearchParams(location.search).get("p");
-	if (q) return state.titleToSlug(state.slugToTitle(q)) || encodeURIComponent(q.replace(/\s+/g, "_"));
-	return "";
+	if (q) {
+		const decoded = (() => {
+			try { return decodeURIComponent(q); } catch { return q; }
+		})();
+		if (decoded.includes("/")) {
+			const route = fromParts(decoded.split("/"));
+			if (route.slug) return route;
+		}
+		const slug = state.titleToSlug(state.slugToTitle(q)) || encodeURIComponent(String(q).replace(/\s+/g, "_"));
+		const lang = langParam && state.isWikiLangCode(langParam) ? langParam.toLowerCase() : null;
+		return { lang, slug };
+	}
+	return { lang: null, slug: "" };
+};
+
+state.readPostSlugFromLocation = function readPostSlugFromLocation() {
+	return state.readPostRouteFromLocation().slug;
 };
 
 state.syncPostSlugToLocation = function syncPostSlugToLocation(post, { replace = true } = {}) {
@@ -52,15 +114,22 @@ state.syncPostSlugToLocation = function syncPostSlugToLocation(post, { replace =
 	if (state.appPageIsOpen?.()) return;
 	const slug = state.titleToSlug(post.title);
 	if (!slug) return;
-	const nextUrl = state.postPathForSlug(slug);
-	const currentSlug = state.readPostSlugFromLocation();
-	if (currentSlug === slug && location.pathname.replace(/\/+$/, "") === nextUrl.replace(/\/+$/, "")) {
+	const lang = state.normalizeWikiLang(post.wikiLang || state.settings?.wikiLang);
+	const nextUrl = state.postPathForRoute({ lang, slug });
+	const current = state.readPostRouteFromLocation();
+	const currentLang = state.normalizeWikiLang(current.lang || state.settings?.wikiLang);
+	if (
+		current.slug === slug
+		&& currentLang === lang
+		&& location.pathname.replace(/\/+$/, "") === nextUrl.replace(/\/+$/, "")
+	) {
 		document.title = `${post.title} — Tikipedia`;
 		return;
 	}
 	try {
-		if (replace) history.replaceState({ postSlug: slug }, "", nextUrl);
-		else history.pushState({ postSlug: slug }, "", nextUrl);
+		const hist = { postSlug: slug, postLang: lang };
+		if (replace) history.replaceState(hist, "", nextUrl);
+		else history.pushState(hist, "", nextUrl);
 	} catch (err) {
 		console.warn("Could not update post URL", err);
 	}
@@ -80,9 +149,12 @@ state.findPostElBySlug = function findPostElBySlug(slug) {
 };
 
 /** Hydrate (if needed) and show a post for a Wikipedia title slug. */
-state.openPostBySlug = async function openPostBySlug(slug, { historyMode = "replace" } = {}) {
+state.openPostBySlug = async function openPostBySlug(slug, { historyMode = "replace", lang = null } = {}) {
 	const title = state.slugToTitle(slug);
 	if (!title) return null;
+
+	if (lang && state.isWikiLangCode(lang) && state.setWikiLang)
+		await state.setWikiLang(lang, { restartFeed: false });
 
 	const existing = state.findPostElBySlug(slug);
 	if (existing) {
@@ -99,6 +171,7 @@ state.openPostBySlug = async function openPostBySlug(slug, { historyMode = "repl
 		post = hydrated[0] || post;
 	}
 	if (!post?.text) return null;
+	post.wikiLang = state.settings?.wikiLang || "simple";
 
 	const el = state.buildPostElement(post);
 	const root = state.postsRoot();
@@ -177,11 +250,13 @@ state.initPostRouting = function initPostRouting() {
 			state._ignoreRouteSync = false;
 			return;
 		}
-		const slug = history.state?.postSlug || state.readPostSlugFromLocation();
+		const route = state.readPostRouteFromLocation();
+		const slug = history.state?.postSlug || route.slug;
+		const lang = history.state?.postLang || route.lang;
 		state._ignoreRouteSync = true;
 		if (slug) {
 			state.showAppPage("foryou", { historyMode: "none" });
-			state.openPostBySlug(slug, { historyMode: "none" }).finally(() => {
+			state.openPostBySlug(slug, { historyMode: "none", lang }).finally(() => {
 				state._ignoreRouteSync = false;
 			});
 		} else {

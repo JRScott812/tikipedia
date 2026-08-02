@@ -49,9 +49,26 @@ if ("serviceWorker" in navigator) {
 state.settingsModal?.querySelectorAll("input").forEach(e => e.onchange = state.saveSettings);
 if (state.voiceSelect) state.voiceSelect.onchange = state.onVoiceSettingsChanged;
 if (state.speechRateInput) state.speechRateInput.oninput = state.onVoiceSettingsChanged;
+if (state.captionSizeInput) state.captionSizeInput.oninput = state.onCaptionSettingsChanged;
+if (state.captionStrokeInput) state.captionStrokeInput.oninput = state.onCaptionSettingsChanged;
 if (state.previewVoiceBtn) state.previewVoiceBtn.onclick = (e) => {
 	e.preventDefault();
 	state.previewSelectedVoice();
+};
+
+state.CAPTION_PREVIEW_SAMPLES = {
+	noun: "Wikipedia",
+	verb: "discovered",
+	adjective: "ancient",
+	adverb: "quickly",
+	preposition: "through",
+	article: "the",
+	pronoun: "they",
+	conjunction: "and",
+	number: "42",
+	date: "1945",
+	link: "Einstein",
+	other: "hello",
 };
 
 state.populateCaptionColorKey = function populateCaptionColorKey() {
@@ -71,6 +88,43 @@ state.populateCaptionColorKey = function populateCaptionColorKey() {
 		li.appendChild(label);
 		el.appendChild(li);
 	});
+	state.updateCaptionPreview();
+}
+
+state.updateCaptionPreview = function updateCaptionPreview() {
+	const word = document.getElementById("captionPreviewWord");
+	const meta = document.getElementById("captionPreviewMeta");
+	if (!word) return;
+	const roles = Object.keys(state.CAP_ROLE_LABELS || {});
+	if (!roles.length) {
+		word.textContent = "Wikipedia";
+		word.style.setProperty("--cap-color", "#FFE566");
+		if (meta) meta.textContent = "Preview";
+		return;
+	}
+	const i = (state._captionPreviewIndex || 0) % roles.length;
+	const role = roles[i];
+	word.textContent = state.CAPTION_PREVIEW_SAMPLES[role] || state.CAP_ROLE_LABELS[role] || "Aa";
+	word.style.setProperty("--cap-color", state.CAP_ROLE_COLORS[role] || "#FFE566");
+	if (meta) meta.textContent = state.CAP_ROLE_LABELS[role] || role;
+}
+
+state.startCaptionPreviewCycle = function startCaptionPreviewCycle() {
+	state.stopCaptionPreviewCycle();
+	state.updateCaptionPreview();
+	state._captionPreviewTimer = setInterval(() => {
+		const roles = Object.keys(state.CAP_ROLE_LABELS || {});
+		if (!roles.length) return;
+		state._captionPreviewIndex = ((state._captionPreviewIndex || 0) + 1) % roles.length;
+		state.updateCaptionPreview();
+	}, 1600);
+}
+
+state.stopCaptionPreviewCycle = function stopCaptionPreviewCycle() {
+	if (state._captionPreviewTimer) {
+		clearInterval(state._captionPreviewTimer);
+		state._captionPreviewTimer = null;
+	}
 }
 
 state.initDataDependentUi = function initDataDependentUi() {
@@ -94,38 +148,60 @@ state.initDataDependentUi = function initDataDependentUi() {
 }
 
 state.searchDebounce = null;
-state.categorySearchInput.oninput = () => {
-	const searchText = state.categorySearchInput.value.trim();
-	state.categorySearchSelect.innerText = "";
-	if (!searchText.length) return;
-	clearTimeout(state.searchDebounce);
-	state.searchDebounce = setTimeout(async () => {
-		try {
-			const data = await state.wikiQuery({
-				action: "opensearch",
-				search: searchText,
-				limit: 20,
-				namespace: 0,
-				redirects: "resolve",
-			}, { useCache: false });
-			const titles = data?.[1] || [];
-			state.categorySearchSelect.innerText = "";
-			titles.forEach(title => {
-				const option = document.createElement("option");
-				option.innerText = title;
-				option.value = title;
-				state.categorySearchSelect.appendChild(option);
-			});
-		} catch (err) {
-			console.warn("search failed", err);
-		}
-	}, 250);
+if (state.categorySearchInput) {
+	state.categorySearchInput.addEventListener("input", () => {
+		const searchText = state.categorySearchInput.value.trim();
+		if (state.categorySearchSelect) state.categorySearchSelect.replaceChildren();
+		if (!searchText.length) return;
+		clearTimeout(state.searchDebounce);
+		state.searchDebounce = setTimeout(async () => {
+			try {
+				if (!state.settings) state.settings = state.loadSettings();
+				const data = await state.wikiQuery({
+					action: "opensearch",
+					search: searchText,
+					limit: 20,
+					namespace: 0,
+					redirects: "resolve",
+				}, { useCache: false });
+				const titles = data?.[1] || [];
+				if (!state.categorySearchSelect) return;
+				state.categorySearchSelect.replaceChildren();
+				if (!titles.length) {
+					const empty = document.createElement("option");
+					empty.disabled = true;
+					empty.textContent = "No results";
+					state.categorySearchSelect.appendChild(empty);
+					return;
+				}
+				titles.forEach(title => {
+					const option = document.createElement("option");
+					option.textContent = title;
+					option.value = title;
+					state.categorySearchSelect.appendChild(option);
+				});
+			} catch (err) {
+				console.warn("search failed", err);
+				if (state.categorySearchSelect) {
+					state.categorySearchSelect.replaceChildren();
+					const empty = document.createElement("option");
+					empty.disabled = true;
+					empty.textContent = "Search failed";
+					state.categorySearchSelect.appendChild(empty);
+				}
+			}
+		}, 250);
+	});
 }
 
-state.categorySearchSelect.oninput = () => {
-	if (!state.categorySearchSelect.value || state.categorySearchSelect.value == "...")
-		return;
-	state.addPickableCategory(state.categorySearchSelect.value, true);
+if (state.categorySearchSelect) {
+	// <select> selection is reliable on `change` (not `input` in all browsers).
+	state.categorySearchSelect.addEventListener("change", () => {
+		const value = state.categorySearchSelect.value;
+		if (!value || value === "...") return;
+		state.addPickableCategory(value, true);
+		state.categorySearchSelect.selectedIndex = -1;
+	});
 }
 
 state.textTime = function textTime(ms) {
@@ -236,6 +312,9 @@ state.showAppPage = function showAppPage(name, { historyMode = "replace" } = {})
 	const header = document.querySelector(".feedHeader");
 	const prev = state.currentAppPage;
 	state.currentAppPage = name || "foryou";
+	document.body.dataset.page = state.currentAppPage;
+	if (prev === "settings" && state.currentAppPage !== "settings")
+		state.stopCaptionPreviewCycle();
 
 	state.hideAllAppPages();
 
@@ -252,6 +331,7 @@ state.showAppPage = function showAppPage(name, { historyMode = "replace" } = {})
 			state.syncAppPageToLocation("foryou", { replace: historyMode !== "push" });
 		if (prev !== "foryou" && state.activePostEl && !document.hidden && !state.descriptionSheet?.open)
 			state.resumePlayback();
+		state.syncThemeColor?.();
 		return;
 	}
 
@@ -275,6 +355,7 @@ state.showAppPage = function showAppPage(name, { historyMode = "replace" } = {})
 		state.renderFollowingPage();
 	} else {
 		if (header) header.hidden = true;
+		state.setFeedSearchOpen?.(false);
 		state.setFeedTabsActive("foryou");
 		const navKey = state.currentAppPage === "about" ? "settings" : state.currentAppPage;
 		state.setBottomNavActive(navKey);
@@ -287,6 +368,7 @@ state.showAppPage = function showAppPage(name, { historyMode = "replace" } = {})
 	page.inert = false;
 	if (historyMode !== "none")
 		state.syncAppPageToLocation(state.currentAppPage, { replace: historyMode !== "push" });
+	state.syncThemeColor?.();
 };
 
 state.renderStatsPage = function renderStatsPage() {
@@ -303,6 +385,7 @@ state.prepareSettingsPage = function prepareSettingsPage() {
 	if (state.wikiLangSelect) state.wikiLangSelect.value = state.settings.wikiLang;
 	state.populateVoiceOptions();
 	state.updateVoiceLangNote();
+	state.startCaptionPreviewCycle();
 };
 
 state.showFollowingPage = function showFollowingPage() {
@@ -338,6 +421,257 @@ state.showAboutModal = state.showAboutPage;
 document.querySelector(".followingTab")?.addEventListener("click", state.showFollowingPage);
 document.querySelector(".forYouTab")?.addEventListener("click", state.showForYouPage);
 
+state.articleSearchDebounce = null;
+state.articleSearchActiveIndex = -1;
+
+/**
+ * Parse a typed query, pasted /p/{lang}/{slug} URL, or raw title.
+ * @returns {{ title: string, lang: string|null }}
+ */
+state.parseReelQuery = function parseReelQuery(raw) {
+	let q = String(raw || "").trim();
+	if (!q) return { title: "", lang: null };
+	let langParam = null;
+	try {
+		if (/^https?:\/\//i.test(q)) {
+			const url = new URL(q);
+			langParam = url.searchParams.get("lang");
+			q = url.pathname + url.search + url.hash;
+		}
+	} catch { /* keep raw */ }
+
+	const fromParts = (parts) => {
+		const segs = (parts || []).filter(Boolean);
+		if (!segs.length) return { title: "", lang: null };
+		if (segs.length >= 2 && state.isWikiLangCode(segs[0]))
+			return { lang: segs[0].toLowerCase(), title: state.slugToTitle(segs.slice(1).join("/")) };
+		return { lang: null, title: state.slugToTitle(segs[0]) };
+	};
+
+	const pathMatch = q.match(/\/p\/([^?#]+)/i) || q.match(/^p\/([^?#]+)/i);
+	if (pathMatch) {
+		const route = fromParts(pathMatch[1].split("/"));
+		if (!route.lang && langParam && state.isWikiLangCode(langParam))
+			route.lang = langParam.toLowerCase();
+		return route;
+	}
+
+	const paramMatch = q.match(/[?&#]p=([^&]+)/i);
+	if (paramMatch) {
+		let p = paramMatch[1];
+		try { p = decodeURIComponent(p); } catch { /* keep */ }
+		if (p.includes("/")) return fromParts(p.split("/"));
+		const lang = langParam && state.isWikiLangCode(langParam) ? langParam.toLowerCase() : null;
+		return { title: state.slugToTitle(p), lang };
+	}
+
+	if (/_/.test(q) && !/\s/.test(q) && !q.includes("/"))
+		return { title: state.slugToTitle(q), lang: null };
+	return { title: q.replace(/_/g, " ").trim(), lang: null };
+};
+
+state.setFeedSearchOpen = function setFeedSearchOpen(open) {
+	const panel = state.feedSearchPanel;
+	const toggle = state.feedSearchToggle;
+	const header = state.feedHeader;
+	if (!panel || !toggle) return;
+	panel.hidden = !open;
+	toggle.setAttribute("aria-expanded", open ? "true" : "false");
+	header?.classList.toggle("feedHeader--searchOpen", open);
+	if (open) {
+		state.feedSearchInput?.focus();
+		state.feedSearchInput?.select();
+	} else {
+		state.clearFeedSearchResults();
+		state.articleSearchActiveIndex = -1;
+	}
+};
+
+state.clearFeedSearchResults = function clearFeedSearchResults() {
+	if (state.feedSearchResults) {
+		state.feedSearchResults.innerHTML = "";
+		state.feedSearchResults.hidden = true;
+	}
+	if (state.feedSearchStatus) {
+		state.feedSearchStatus.hidden = true;
+		state.feedSearchStatus.textContent = "";
+	}
+};
+
+state.setFeedSearchStatus = function setFeedSearchStatus(text) {
+	if (!state.feedSearchStatus) return;
+	if (!text) {
+		state.feedSearchStatus.hidden = true;
+		state.feedSearchStatus.textContent = "";
+		return;
+	}
+	state.feedSearchStatus.hidden = false;
+	state.feedSearchStatus.textContent = text;
+};
+
+state.renderFeedSearchResults = function renderFeedSearchResults(titles) {
+	const list = state.feedSearchResults;
+	if (!list) return;
+	list.innerHTML = "";
+	state.articleSearchActiveIndex = -1;
+	if (!titles.length) {
+		list.hidden = true;
+		return;
+	}
+	list.hidden = false;
+	titles.forEach((title, i) => {
+		const li = document.createElement("li");
+		li.setAttribute("role", "option");
+		li.id = `feedSearchOpt-${i}`;
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "feedSearchResult";
+		btn.textContent = title;
+		btn.addEventListener("click", () => state.openReelByTitle(title));
+		li.appendChild(btn);
+		list.appendChild(li);
+	});
+};
+
+state.highlightFeedSearchResult = function highlightFeedSearchResult(index) {
+	const buttons = [...(state.feedSearchResults?.querySelectorAll(".feedSearchResult") || [])];
+	if (!buttons.length) {
+		state.articleSearchActiveIndex = -1;
+		return;
+	}
+	const next = ((index % buttons.length) + buttons.length) % buttons.length;
+	state.articleSearchActiveIndex = next;
+	buttons.forEach((btn, i) => {
+		btn.setAttribute("aria-selected", i === next ? "true" : "false");
+		if (i === next) btn.scrollIntoView({ block: "nearest" });
+	});
+};
+
+state.openReelByTitle = async function openReelByTitle(title, { lang = null } = {}) {
+	const clean = String(title || "").trim();
+	if (!clean) return null;
+	state.setFeedSearchStatus(`Loading ${clean}…`);
+	state.showAppPage("foryou", { historyMode: "none" });
+	const el = await state.openPostBySlug(state.titleToSlug(clean), {
+		historyMode: "push",
+		lang: lang || null,
+	});
+	if (!el) {
+		state.setFeedSearchStatus(`Couldn’t find “${clean}”. Try another title.`);
+		return null;
+	}
+	if (state.feedSearchInput) state.feedSearchInput.value = clean;
+	state.setFeedSearchOpen(false);
+	return el;
+};
+
+state.openReelFromQuery = async function openReelFromQuery(raw) {
+	const { title, lang } = state.parseReelQuery(raw);
+	if (!title) {
+		state.setFeedSearchStatus("Type an article title or paste a /p/lang/Title URL.");
+		return null;
+	}
+	return state.openReelByTitle(title, { lang });
+};
+
+state.runArticleSearch = async function runArticleSearch(searchText) {
+	const q = searchText.trim();
+	if (q.length < 2) {
+		state.clearFeedSearchResults();
+		return;
+	}
+	// Path/slug paste → skip autocomplete noise
+	if (/\/p\//i.test(q) || /^p\//i.test(q) || /^https?:\/\//i.test(q)) {
+		state.clearFeedSearchResults();
+		const parsed = state.parseReelQuery(q);
+		const hint = parsed.lang ? ` (${parsed.lang})` : "";
+		state.setFeedSearchStatus(`Press Enter to open${hint}.`);
+		return;
+	}
+	state.setFeedSearchStatus("Searching…");
+	try {
+		const data = await state.wikiQuery({
+			action: "opensearch",
+			search: q,
+			limit: 8,
+			namespace: 0,
+			redirects: "resolve",
+		}, { useCache: false });
+		const titles = data?.[1] || [];
+		if (!titles.length) {
+			state.clearFeedSearchResults();
+			state.setFeedSearchStatus("No articles found.");
+			return;
+		}
+		state.setFeedSearchStatus("");
+		state.renderFeedSearchResults(titles);
+	} catch (err) {
+		console.warn("article search failed", err);
+		state.setFeedSearchStatus("Search failed. Check your connection.");
+	}
+};
+
+state.initFeedSearch = function initFeedSearch() {
+	const toggle = state.feedSearchToggle;
+	const panel = state.feedSearchPanel;
+	const input = state.feedSearchInput;
+	if (!toggle || !panel || !input) return;
+
+	toggle.addEventListener("click", (e) => {
+		e.stopPropagation();
+		state.setFeedSearchOpen(panel.hidden);
+	});
+
+	panel.addEventListener("click", (e) => e.stopPropagation());
+	panel.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const buttons = [...(state.feedSearchResults?.querySelectorAll(".feedSearchResult") || [])];
+		if (state.articleSearchActiveIndex >= 0 && buttons[state.articleSearchActiveIndex]) {
+			await state.openReelByTitle(buttons[state.articleSearchActiveIndex].textContent);
+			return;
+		}
+		await state.openReelFromQuery(input.value);
+	});
+
+	input.addEventListener("input", () => {
+		const searchText = input.value;
+		clearTimeout(state.articleSearchDebounce);
+		state.articleSearchDebounce = setTimeout(() => state.runArticleSearch(searchText), 250);
+	});
+
+	input.addEventListener("keydown", (e) => {
+		const buttons = [...(state.feedSearchResults?.querySelectorAll(".feedSearchResult") || [])];
+		if (e.key === "Escape") {
+			e.preventDefault();
+			state.setFeedSearchOpen(false);
+			return;
+		}
+		if (!buttons.length) return;
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			state.highlightFeedSearchResult(state.articleSearchActiveIndex + 1);
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			state.highlightFeedSearchResult(state.articleSearchActiveIndex <= 0
+				? buttons.length - 1
+				: state.articleSearchActiveIndex - 1);
+		}
+	});
+
+	document.addEventListener("click", (e) => {
+		if (panel.hidden) return;
+		if (state.feedSearch?.contains(e.target)) return;
+		state.setFeedSearchOpen(false);
+	});
+
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && !panel.hidden)
+			state.setFeedSearchOpen(false);
+	});
+};
+
+state.initFeedSearch();
+
 state.unlockSpeechAndPlay = function unlockSpeechAndPlay() {
 	state.speechUnlocked = true;
 	delete state.tapToPlay.dataset.show;
@@ -358,10 +692,13 @@ state.startFeed = async function startFeed() {
 		state.showAppPage(initialPage, { historyMode: "replace" });
 		return;
 	}
-	const initialSlug = state.readPostSlugFromLocation();
-	if (initialSlug) {
+	const initialRoute = state.readPostRouteFromLocation();
+	if (initialRoute.slug) {
 		state.loadStatus("Loading article…");
-		const opened = await state.openPostBySlug(initialSlug, { historyMode: "replace" });
+		const opened = await state.openPostBySlug(initialRoute.slug, {
+			historyMode: "replace",
+			lang: initialRoute.lang,
+		});
 		const loadingEl = document.getElementById("loading");
 		if (loadingEl) loadingEl.remove();
 		if (opened) {
@@ -410,18 +747,20 @@ document.addEventListener("keydown", (e) => {
 });
 
 state.addPickableCategory = function addPickableCategory(cat, checked) {
-	if (document.querySelector(`.categoryPicker input[data-category="${cat.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`))
+	const list = state.categoryPickList;
+	if (!list || !cat) return;
+	const key = String(cat);
+	if ([...list.querySelectorAll("input[data-category]")].some(el => el.dataset.category === key))
 		return;
 	const picker = document.createElement("label");
+	picker.classList.add("categoryPicker");
 	const check = document.createElement("input");
 	check.type = "checkbox";
-	picker.innerText = `${cat.slice(0, 1).toUpperCase()}${cat.slice(1).toLowerCase()}`;
-	picker.appendChild(check);
-	picker.classList.add("categoryPicker");
-	check.dataset.category = cat;
-	if (checked)
-		check.checked = true;
-	state.categoryPickList.appendChild(picker);
+	check.dataset.category = key;
+	if (checked) check.checked = true;
+	const label = key.slice(0, 1).toUpperCase() + key.slice(1);
+	picker.append(document.createTextNode(label), check);
+	list.appendChild(picker);
 }
 
 state.updateProgress = function updateProgress() {
@@ -461,72 +800,86 @@ state.checkVersionAsync = async function checkVersionAsync() {
 }
 
 state.loadStatus = function loadStatus(text) {
-	if (state.startBtn) state.startBtn.innerText = `Loading shorts... (${text})`;
 	const loadingEl = document.getElementById("loading");
 	if (loadingEl)
 		loadingEl.innerText = `Loading...\n(${text})`;
+	// Don't overwrite the onboarding continue label while that screen is up.
+	if (document.body.dataset.onboarding) return;
+	if (state.startBtn && state.startBtn.dataset.ready !== "1")
+		state.startBtn.innerText = `Loading shorts... (${text})`;
 }
 
 state.main = async function main() {
-	if (/iPad|iPhone|iPod/.test(navigator.userAgent))
-		document.getElementById("iosmessage").style.display = "block";
+	if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+		const ios = document.getElementById("iosmessage");
+		if (ios) ios.hidden = false;
+	}
 	state.loadStatus("loading profile");
 	const hasProfile = state.initProfile();
 	const startScreen = state.startScreen;
-	if (hasProfile)
-		startScreen.style.display = "none";
-	else
-		startScreen.showPopover();
-	state.bottomNav.inert = true;
-	state.categoryPickList.replaceChildren();
-	state.defaultCategories.forEach(e => state.addPickableCategory(e));
+
 	state.populateVoiceOptions();
 	state.autoMatchVoiceForLang({ force: state.settings.voiceAutoMatched !== false });
-	state.loadStatus("starting…");
-	for (let i = 0; i < 500; i++) {
+
+	// Brief wait for SW registration (not a long flicker loop).
+	for (let i = 0; i < 50; i++) {
 		if (window.swReg && (window.swReg == "err" || window.swReg?.active)) break;
 		await new Promise(r => setTimeout(r, 10));
 	}
 	state.checkVersionAsync();
 	state.feedReady = true;
-	state.loadStatus("Ready");
-	document.getElementById("loading")?.remove();
-	state.startBtn.removeAttribute("disabled");
-	state.categorySearchInput.removeAttribute("disabled");
-	state.startBtn.innerText = "I'm an adult, continue";
-	state.startBtn.onclick = async () => {
-		state.bottomNav.inert = false;
-		const checked = [...document.querySelectorAll(".categoryPicker>input:checked")];
-		for (const e of checked) {
-			state.categoryScores[e.dataset.category] = state.defaultCategories.includes(e.dataset.category) ? 1000 : 5000;
-		}
-		const customTitles = checked
-			.map(e => e.dataset.category)
-			.filter(cat => !state.defaultCategories.includes(cat));
-		if (customTitles.length) {
-			try {
-				const pages = await state.hydrateByTitles(customTitles);
-				pages.forEach(page => state.engagePost(page, 100));
-			} catch (err) {
-				console.warn("onboarding hydrate failed", err);
-			}
-		}
-		startScreen.hidePopover();
-		startScreen.remove();
-		setTimeout(state.saveProfile, 100);
-		document.querySelector('meta[name="theme-color"]').setAttribute("content", "#000000");
-		state.speechUnlocked = true;
-		await state.startFeed();
-	};
-	state.initProfile();
+
 	if (hasProfile) {
-		state.bottomNav.inert = false;
-		startScreen.remove();
+		startScreen?.remove?.();
+		delete document.body.dataset.onboarding;
+		if (state.bottomNav) state.bottomNav.inert = false;
+		document.getElementById("loading")?.remove();
 		setTimeout(state.saveProfile, 100);
-		document.querySelector('meta[name="theme-color"]').setAttribute("content", "#000000");
+		state.syncThemeColor?.();
 		await state.startFeed();
 		state.tryUnlockSpeech();
+		return;
 	}
+
+	// Onboarding: build categories first, then reveal the popover once.
+	document.body.dataset.onboarding = "1";
+	if (state.bottomNav) state.bottomNav.inert = true;
+	state.categoryPickList?.replaceChildren();
+	state.defaultCategories.forEach(e => state.addPickableCategory(e));
+	state.categorySearchInput?.removeAttribute("disabled");
+	if (state.startBtn) {
+		state.startBtn.dataset.ready = "1";
+		state.startBtn.innerText = "Continue";
+		state.startBtn.removeAttribute("disabled");
+		state.startBtn.onclick = async () => {
+			if (state.bottomNav) state.bottomNav.inert = false;
+			const checked = [...document.querySelectorAll(".categoryPicker input:checked")];
+			for (const e of checked) {
+				state.categoryScores[e.dataset.category] = state.defaultCategories.includes(e.dataset.category) ? 1000 : 5000;
+			}
+			const customTitles = checked
+				.map(e => e.dataset.category)
+				.filter(cat => !state.defaultCategories.includes(cat));
+			if (customTitles.length) {
+				try {
+					const pages = await state.hydrateByTitles(customTitles);
+					pages.forEach(page => state.engagePost(page, 100));
+				} catch (err) {
+					console.warn("onboarding hydrate failed", err);
+				}
+			}
+			startScreen?.hidePopover?.();
+			startScreen?.remove?.();
+			delete document.body.dataset.onboarding;
+			setTimeout(state.saveProfile, 100);
+			state.syncThemeColor?.();
+			state.speechUnlocked = true;
+			await state.startFeed();
+		};
+	}
+	document.getElementById("loading")?.remove();
+	state.syncThemeColor?.();
+	startScreen?.showPopover?.();
 }
 
 state.bootstrap = async function bootstrap() {

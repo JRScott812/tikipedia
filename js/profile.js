@@ -12,14 +12,22 @@ state.loadSettings = function loadSettings() {
 		voiceURI: "",
 		speechRate: 1,
 		voiceAutoMatched: true,
+		captionSize: 1,
+		captionStroke: 2,
 	};
 	const loadedSettings = JSON.parse(localStorage.getItem("tikipedia-settings") ?? '{}');
 	const computedSettings = Object.assign(baseSettings, loadedSettings);
 	if (!state.WIKI_LANGUAGES.some(l => l.code === computedSettings.wikiLang))
 		computedSettings.wikiLang = "simple";
-	document.querySelector(`#${computedSettings.theme}`).checked = true;
-	document.getElementById("setting-storeData").checked = computedSettings.storeData;
-	document.getElementById("setting-openMainWiki").checked = computedSettings.openMainWiki;
+	computedSettings.captionSize = state.clampCaptionSize(computedSettings.captionSize);
+	computedSettings.captionStroke = state.clampCaptionStroke(computedSettings.captionStroke);
+	const themeEl = document.querySelector(`#${computedSettings.theme}`);
+	if (themeEl) themeEl.checked = true;
+	queueMicrotask(() => state.syncThemeColor?.());
+	const storeEl = document.getElementById("setting-storeData");
+	if (storeEl) storeEl.checked = computedSettings.storeData;
+	const wikiEl = document.getElementById("setting-openMainWiki");
+	if (wikiEl) wikiEl.checked = computedSettings.openMainWiki;
 	const langEl = document.getElementById("setting-wikiLang");
 	if (langEl) langEl.value = computedSettings.wikiLang;
 	const rateEl = document.getElementById("setting-speechRate");
@@ -27,7 +35,75 @@ state.loadSettings = function loadSettings() {
 		rateEl.value = computedSettings.speechRate;
 		document.getElementById("speechRateLabel").textContent = `${Number(computedSettings.speechRate).toFixed(1)}x`;
 	}
+	const sizeEl = document.getElementById("setting-captionSize");
+	if (sizeEl) sizeEl.value = computedSettings.captionSize;
+	const strokeEl = document.getElementById("setting-captionStroke");
+	if (strokeEl) strokeEl.value = computedSettings.captionStroke;
+	state.settings = computedSettings;
+	state.applyCaptionSettings();
 	return computedSettings;
+}
+
+state.clampCaptionSize = function clampCaptionSize(value) {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return 1;
+	return Math.min(1.5, Math.max(0.7, Math.round(n * 10) / 10));
+};
+
+state.clampCaptionStroke = function clampCaptionStroke(value) {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return 2;
+	return Math.min(5, Math.max(0, Math.round(n * 2) / 2));
+};
+
+state.applyCaptionSettings = function applyCaptionSettings() {
+	const size = state.clampCaptionSize(state.settings?.captionSize);
+	const stroke = state.clampCaptionStroke(state.settings?.captionStroke);
+	if (state.settings) {
+		state.settings.captionSize = size;
+		state.settings.captionStroke = stroke;
+	}
+	document.documentElement.style.setProperty("--caption-size", String(size));
+	document.documentElement.style.setProperty("--caption-stroke", `${stroke}px`);
+	const sizeLabel = document.getElementById("captionSizeLabel");
+	if (sizeLabel) sizeLabel.textContent = `${size.toFixed(1)}×`;
+	const strokeLabel = document.getElementById("captionStrokeLabel");
+	if (strokeLabel) {
+		strokeLabel.textContent = Number.isInteger(stroke) ? `${stroke}px` : `${stroke.toFixed(1)}px`;
+	}
+};
+
+state.onCaptionSettingsChanged = function onCaptionSettingsChanged() {
+	const sizeEl = document.getElementById("setting-captionSize");
+	const strokeEl = document.getElementById("setting-captionStroke");
+	if (sizeEl) state.settings.captionSize = state.clampCaptionSize(sizeEl.value);
+	if (strokeEl) state.settings.captionStroke = state.clampCaptionStroke(strokeEl.value);
+	state.applyCaptionSettings();
+	state.saveSettings();
+}
+
+state.themeIsLight = function themeIsLight() {
+	const theme = document.querySelector("[name=theme]:checked")?.id
+		?? state.settings?.theme
+		?? "theme-auto";
+	if (theme === "theme-light") return true;
+	if (theme === "theme-dark") return false;
+	return window.matchMedia("(prefers-color-scheme: light)").matches;
+};
+
+state.syncThemeColor = function syncThemeColor() {
+	const meta = document.querySelector('meta[name="theme-color"]');
+	if (!meta) return;
+	const feedDark = !document.body.dataset.onboarding && !state.appPageIsOpen?.();
+	meta.setAttribute("content", feedDark || !state.themeIsLight() ? "#000000" : "#f5f5f5");
+};
+
+if (!state._themeMediaBound) {
+	state._themeMediaBound = true;
+	window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+		if ((document.querySelector("[name=theme]:checked")?.id ?? state.settings?.theme) === "theme-auto")
+			state.syncThemeColor();
+	});
 }
 
 state.saveSettings = function saveSettings() {
@@ -45,7 +121,13 @@ state.saveSettings = function saveSettings() {
 		state.settings.speechRate = Number(rateEl.value) || 1;
 		document.getElementById("speechRateLabel").textContent = `${state.settings.speechRate.toFixed(1)}x`;
 	}
+	const sizeEl = document.getElementById("setting-captionSize");
+	if (sizeEl) state.settings.captionSize = state.clampCaptionSize(sizeEl.value);
+	const strokeEl = document.getElementById("setting-captionStroke");
+	if (strokeEl) state.settings.captionStroke = state.clampCaptionStroke(strokeEl.value);
+	state.applyCaptionSettings();
 	localStorage.setItem("tikipedia-settings", JSON.stringify(state.settings));
+	state.syncThemeColor();
 }
 
 state.getWikiLangInfo = function getWikiLangInfo(code) {

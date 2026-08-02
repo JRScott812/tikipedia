@@ -252,6 +252,7 @@ state.apiPageToPost = function apiPageToPost(apiPage) {
 	const post = {
 		title: apiPage.title,
 		id: apiPage.pageid,
+		wikiLang: state.settings?.wikiLang || "simple",
 		text: extract.slice(0, 600),
 		thumb: thumb || null,
 		categories,

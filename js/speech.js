@@ -126,10 +126,10 @@ state.onVoiceSettingsChanged = function onVoiceSettingsChanged() {
 		state.speakPost(state.activePostEl, state.activePostData, { restart: true });
 }
 
-state.onWikiLangChanged = async function onWikiLangChanged() {
-	const langEl = document.getElementById("setting-wikiLang");
-	const next = langEl?.value || "simple";
-	if (next === state.settings.wikiLang) return;
+/** Switch Wikipedia language. Optionally skip feed restart (deep links / search). */
+state.setWikiLang = async function setWikiLang(next, { restartFeed = true } = {}) {
+	next = state.normalizeWikiLang ? state.normalizeWikiLang(next) : (next || "simple");
+	if (next === state.settings.wikiLang) return false;
 	state.persistLangSlice();
 	state.settings.wikiLang = next;
 	state.settings.voiceAutoMatched = true;
@@ -146,13 +146,27 @@ state.onWikiLangChanged = async function onWikiLangChanged() {
 		postsEl.innerHTML = "";
 		postsEl.scrollTop = 0;
 	}
+	if (state.wikiLangSelect) state.wikiLangSelect.value = next;
 	state.autoMatchVoiceForLang({ force: true });
 	state.populateVoiceOptions();
-	state.loadStatus("Fetching shorts…");
 	state.feedReady = true;
-	await state.ensurePrefetch();
-	state.startFeed();
+	if (restartFeed) {
+		// Drop any /p/{lang}/… deep link so startFeed doesn't reopen the old edition.
+		try {
+			history.replaceState({ appPage: "foryou" }, "", state.appPagePath("foryou"));
+		} catch { /* ignore */ }
+		state.loadStatus("Fetching shorts…");
+		await state.ensurePrefetch();
+		state.startFeed();
+	}
 	setTimeout(state.saveProfile, 100);
+	return true;
+};
+
+state.onWikiLangChanged = async function onWikiLangChanged() {
+	const langEl = document.getElementById("setting-wikiLang");
+	const next = langEl?.value || "simple";
+	await state.setWikiLang(next, { restartFeed: true });
 }
 
 state.stopCaptionTimer = function stopCaptionTimer() {
@@ -695,7 +709,7 @@ state.tokenSpeechForm = function tokenSpeechForm(tokens, index) {
 			}
 			if (/^\d{1,2}$/.test(day)) {
 				const ord = state.ORDINAL_WORDS[Number(day)] || day;
-				return `${core} ${ord}${stripTrailingPunct(dayTok).punct || ""} `;
+				return `${core} ${ord}${state.stripTrailingPunct(dayTok).punct || ""} `;
 			}
 		}
 
@@ -720,42 +734,71 @@ state.tokenSpeechForm = function tokenSpeechForm(tokens, index) {
 state.annotateSpeechTokens = function annotateSpeechTokens(spans) {
 	const display = spans.map(s => s.textContent);
 	const spoken = display.map(t => t);
+	/** @type {Map<number, number[]>} lead index → indices merged into it (including lead) */
+	const mergeGroups = new Map();
 	const consumed = new Set();
+
+	const markMerge = (lead, extras) => {
+		const group = [lead, ...extras];
+		mergeGroups.set(lead, group);
+		for (const idx of extras) consumed.add(idx);
+	};
+
 	for (let i = 0; i < display.length; i++) {
 		if (consumed.has(i)) continue;
 		const form = state.tokenSpeechForm(display, i);
 		if (!form) continue;
-		spoken[i] = form.endsWith(" ") ? form : form;
-		// Collapse multi-token date phrases into the first token.
+		spoken[i] = form.endsWith(" ") ? form : `${form} `;
+
+		// Collapse multi-token date phrases into the first token for speech + karaoke.
 		if (state.isEnglishSpeechLang() && state.isMonthToken(state.stripTrailingPunct(display[i]).core)) {
 			const day = state.stripTrailingPunct(display[i + 1] || "").core.replace(/,/g, "");
 			const year = state.stripTrailingPunct(display[i + 2] || "").core;
 			if (/^\d{1,2}$/.test(day)) {
-				spoken[i + 1] = "";
-				consumed.add(i + 1);
-				if (/^\d{3,4}$/.test(year)) {
-					spoken[i + 2] = "";
-					consumed.add(i + 2);
-				}
+				const extras = [i + 1];
+				if (/^\d{3,4}$/.test(year)) extras.push(i + 2);
+				markMerge(i, extras);
 			}
-		} else if (state.isEnglishSpeechLang() && /^\d{1,2}$/.test(state.stripTrailingPunct(display[i]).core) && state.isMonthToken(display[i + 1] || "")) {
-			spoken[i + 1] = "";
-			consumed.add(i + 1);
+		} else if (
+			state.isEnglishSpeechLang()
+			&& /^\d{1,2}$/.test(state.stripTrailingPunct(display[i]).core)
+			&& state.isMonthToken(display[i + 1] || "")
+		) {
+			const extras = [i + 1];
 			const year = state.stripTrailingPunct(display[i + 2] || "").core;
-			if (/^\d{3,4}$/.test(year)) {
-				spoken[i + 2] = "";
-				consumed.add(i + 2);
-			}
+			if (/^\d{3,4}$/.test(year)) extras.push(i + 2);
+			markMerge(i, extras);
 		}
 	}
+
+	// Merge collapsed date tokens into one visible caption word (karaoke shows
+	// "January 15, 1990" while TTS speaks the expanded form).
+	for (const [lead, group] of mergeGroups) {
+		const span = spans[lead];
+		if (!span) continue;
+		const merged = group.map(idx => display[idx].trim()).filter(Boolean).join(" ");
+		const trail = group.some(idx => /\s$/.test(display[idx])) || lead < spans.length - 1;
+		span.textContent = trail && !/\s$/.test(merged) ? `${merged} ` : merged;
+		span.dataset.capRole = "date";
+		span.style.setProperty("--cap-color", state.CAP_ROLE_COLORS.date || state.CAP_ROLE_COLORS.other);
+	}
+
 	spans.forEach((span, i) => {
-		const displayText = display[i];
+		if (consumed.has(i)) return;
+		const displayText = span.textContent;
 		const speakText = spoken[i];
 		if (speakText !== displayText)
 			span.dataset.speak = speakText;
 		else
 			delete span.dataset.speak;
 	});
+
+	// Drop consumed day/year spans so boundary sync can't land on blank words.
+	for (let i = spans.length - 1; i >= 0; i--) {
+		if (!consumed.has(i)) continue;
+		spans[i].remove();
+		spans.splice(i, 1);
+	}
 }
 
 state.toSpeechText = function toSpeechText(text) {
