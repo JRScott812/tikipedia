@@ -32,6 +32,12 @@ export function useSpeechPlayback({
 	const enabledRef = useRef(enabled);
 	enabledRef.current = enabled;
 
+	const spokenText = post ? app.getSpokenText(post) : "";
+	const sectionKey =
+		post && app.sectionPlayback && app.sectionPlayback.postId === post.id
+			? `${app.sectionPlayback.sectionIndex}:${app.sectionPlayback.text}`
+			: `0:${spokenText}`;
+
 	useEffect(() => {
 		onCaptionWordRef.current = onCaptionWord;
 	}, [onCaptionWord]);
@@ -86,31 +92,42 @@ export function useSpeechPlayback({
 	}
 
 	const controller = controllerRef.current;
+	const prevSectionKeyRef = useRef(sectionKey);
 
 	useEffect(() => {
 		if (!enabled || !post || !postEl) {
 			controller.stopPlayback();
 			return;
 		}
+		const sectionChanged = prevSectionKeyRef.current !== sectionKey;
+		prevSectionKeyRef.current = sectionKey;
+
+		if (sectionChanged) {
+			// Drop any in-flight utterance so unpause starts the new section from 0.
+			controller.stopPlayback();
+		}
+
 		if (app.playbackPaused) {
 			controller.pause();
 			return;
 		}
 		const words = [...postEl.querySelectorAll<HTMLElement>(".caption-word")];
 		if (!words.length) return;
-		// Prefer controller.resume() after a pause so we clear the paused flag and
-		// continue from the word we stopped on (not a stale React captionIndex).
-		if (controller.isPaused()) {
-			controller.resume(words, post.text);
+		if (sectionChanged) {
+			controller.speakFrom(words, spokenText, 0);
+		} else if (controller.isPaused()) {
+			controller.resume(words, spokenText);
 		} else {
-			controller.speakFrom(words, post.text, app.captionIndex);
+			controller.speakFrom(words, spokenText, app.captionIndex);
 		}
-		// Only re-speak when post/active/mute/rate/unlock/pause change — not every caption tick.
+		// Only re-speak when post/section/mute/rate/unlock/pause change — not every caption tick.
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- captionIndex intentionally omitted
 	}, [
 		enabled,
 		post?.id,
 		postEl,
+		sectionKey,
+		spokenText,
 		app.playbackPaused,
 		app.settings.muted,
 		app.playbackRate,
@@ -131,12 +148,14 @@ export function useSpeechPlayback({
 		speakFrom: (startIndex = 0) => {
 			if (!post || !postEl) return;
 			const words = [...postEl.querySelectorAll<HTMLElement>(".caption-word")];
-			controller.speakFrom(words, post.text, startIndex);
+			const text = appRef.current.getSpokenText(post);
+			controller.speakFrom(words, text, startIndex);
 		},
 		seek: (index: number, resume = true) => {
 			if (!post || !postEl) return 0;
 			const words = [...postEl.querySelectorAll<HTMLElement>(".caption-word")];
-			return controller.seek(words, post.text, index, { resume });
+			const text = appRef.current.getSpokenText(post);
+			return controller.seek(words, text, index, { resume });
 		},
 		previewSeek: (index: number) => {
 			if (!postEl) return 0;
@@ -146,7 +165,8 @@ export function useSpeechPlayback({
 		restartFromCurrent: () => {
 			if (!post || !postEl || app.playbackPaused) return;
 			const words = [...postEl.querySelectorAll<HTMLElement>(".caption-word")];
-			controller.restartFromCurrent(words, post.text);
+			const text = appRef.current.getSpokenText(post);
+			controller.restartFromCurrent(words, text);
 		}
 	};
 }

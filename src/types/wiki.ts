@@ -61,6 +61,22 @@ export interface RelatedInSummary {
 	label: string;
 }
 
+/** Top-level Wikipedia TOC section (MediaWiki parse index). */
+export interface ArticleSection {
+	index: number;
+	title: string;
+}
+
+/** Session overlay for which article section is being narrated. */
+export interface SectionPlayback {
+	postId: number;
+	sectionIndex: number;
+	sectionTitle: string;
+	text: string;
+	/** Link matches for the current spoken text (does not replace summary related chips). */
+	related?: RelatedInSummary[];
+}
+
 /** Feed post / cached wiki page. */
 export interface Post {
 	title: string;
@@ -78,6 +94,8 @@ export interface Post {
 	score?: number;
 	_summaryLinkRefs?: WikiLinkRef[];
 	_relatedInSummary?: RelatedInSummary[];
+	/** In-session cache of top-level TOC after description sheet opens. */
+	_sections?: ArticleSection[];
 }
 
 /** Topic group from topics.json (patterns compiled to RegExp). */

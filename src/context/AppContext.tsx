@@ -34,18 +34,32 @@ import { autoMatchVoiceForLang, missingVoiceNote } from "../lib/speech";
 import {
 	clearLiveCaches,
 	engagePost,
+	fetchSectionPlaintext,
+	fetchTopLevelSections,
 	getNextPost,
 	getPageByTitle,
+	getSpokenSectionTitle,
+	getSpokenText,
 	hydrateByTitles,
+	prefetchRelatedForSection,
 	shareArticle,
 	type EngagementDeps,
 	type WikiFeedDeps
 } from "../lib/wiki";
-import type { Post, ProfileStore, Settings } from "../types/wiki";
+import type {
+	ArticleSection,
+	Post,
+	ProfileStore,
+	SectionPlayback,
+	Settings
+} from "../types/wiki";
 
 export type DescState = {
 	post: Post;
 	related: Array<{ id: number; title: string; page: Post }>;
+	sections: ArticleSection[];
+	sectionsLoading: boolean;
+	sectionError: string | null;
 } | null;
 
 export type EngagementState = {
@@ -80,8 +94,11 @@ export type AppContextValue = {
 	showTapToPlay: boolean;
 	voices: SpeechSynthesisVoice[];
 	desc: DescState;
+	sectionPlayback: SectionPlayback | null;
 	candidateQueue: Post[];
 	APP_VERSION: string;
+	getSpokenText: (post: Post) => string;
+	getSpokenSectionTitle: (post: Post) => string;
 	updateSettings: (patch: Partial<Settings>) => void;
 	save: () => void;
 	likePost: (post: Post) => void;
@@ -109,6 +126,11 @@ export type AppContextValue = {
 	completeOnboarding: (picked: string[]) => Promise<void>;
 	openDescription: (post: Post) => void;
 	closeDescription: () => void;
+	selectSection: (
+		post: Post,
+		section: ArticleSection | { index: 0; title: string }
+	) => Promise<void>;
+	clearSectionError: () => void;
 	sharePost: (post: Post) => Promise<"shared" | "copied" | "aborted" | "failed">;
 	getFeedDeps: () => WikiFeedDeps;
 	syncThemeColor: () => void;
@@ -180,8 +202,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [showTapToPlay, setShowTapToPlay] = useState(false);
 	const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 	const [desc, setDesc] = useState<DescState>(null);
+	const [sectionPlayback, setSectionPlayback] = useState<SectionPlayback | null>(null);
 	const [candidateQueue, setCandidateQueue] = useState<Post[]>([]);
 	const [voiceNote, setVoiceNote] = useState("");
+	const sectionSelectGen = useRef(0);
 
 	const settingsRef = useRef(settings);
 	const engagementRef = useRef(engagement);
@@ -689,13 +713,107 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			title: r.title,
 			page: r.page
 		}));
-		setDesc({ post, related });
+		const cached = post._sections;
+		setDesc({
+			post,
+			related,
+			sections: cached || [],
+			sectionsLoading: !cached,
+			sectionError: null
+		});
 		setPlaybackPaused(true);
+		if (!cached) {
+			void (async () => {
+				const sections = await fetchTopLevelSections(
+					post,
+					settingsRef.current.wikiLang || "simple"
+				);
+				setDesc((prev) =>
+					prev && prev.post.id === post.id
+						? { ...prev, sections, sectionsLoading: false }
+						: prev
+				);
+			})();
+		}
 	}, []);
 
 	const closeDescription = useCallback(() => {
 		setDesc(null);
 	}, []);
+
+	const clearSectionError = useCallback(() => {
+		setDesc((prev) => (prev ? { ...prev, sectionError: null } : prev));
+	}, []);
+
+	const getSpokenTextForPost = useCallback(
+		(post: Post) => getSpokenText(post, sectionPlayback),
+		[sectionPlayback]
+	);
+
+	const getSpokenSectionTitleForPost = useCallback(
+		(post: Post) => getSpokenSectionTitle(post, sectionPlayback),
+		[sectionPlayback]
+	);
+
+	const selectSection = useCallback(
+		async (post: Post, section: ArticleSection | { index: 0; title: string }) => {
+			const gen = ++sectionSelectGen.current;
+			const lang = settingsRef.current.wikiLang || "simple";
+			setDesc((prev) => (prev ? { ...prev, sectionError: null } : prev));
+
+			if (section.index === 0) {
+				setSectionPlayback({
+					postId: post.id,
+					sectionIndex: 0,
+					sectionTitle: "Summary",
+					text: post.text,
+					related: post._relatedInSummary
+				});
+				setCaptionIndex(0);
+				return;
+			}
+
+			try {
+				const text = await fetchSectionPlaintext(post, section.index, lang);
+				if (gen !== sectionSelectGen.current) return;
+				if (!text || text.length < 20) {
+					setDesc((prev) =>
+						prev && prev.post.id === post.id
+							? {
+									...prev,
+									sectionError: "Couldn't load that section."
+								}
+							: prev
+					);
+					return;
+				}
+				const related = await prefetchRelatedForSection(
+					post,
+					settingsRef.current,
+					section.index,
+					text
+				);
+				if (gen !== sectionSelectGen.current) return;
+				setSectionPlayback({
+					postId: post.id,
+					sectionIndex: section.index,
+					sectionTitle: section.title,
+					text,
+					related
+				});
+				setCaptionIndex(0);
+			} catch (err) {
+				console.warn("selectSection failed", err);
+				if (gen !== sectionSelectGen.current) return;
+				setDesc((prev) =>
+					prev && prev.post.id === post.id
+						? { ...prev, sectionError: "Couldn't load that section." }
+						: prev
+				);
+			}
+		},
+		[]
+	);
 
 	const sharePost = useCallback(async (post: Post) => {
 		const data = appDataRef.current;
@@ -831,6 +949,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		syncThemeColor();
 	}, [settings.theme, syncThemeColor]);
 
+	// Always start a newly activated post on Summary.
+	useEffect(() => {
+		setSectionPlayback(null);
+		sectionSelectGen.current += 1;
+	}, [activePostId]);
+
 	const value = useMemo<AppContextValue>(
 		() => ({
 			appData,
@@ -852,8 +976,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			showTapToPlay,
 			voices,
 			desc,
+			sectionPlayback,
 			candidateQueue,
 			APP_VERSION,
+			getSpokenText: getSpokenTextForPost,
+			getSpokenSectionTitle: getSpokenSectionTitleForPost,
 			updateSettings,
 			save,
 			likePost,
@@ -881,6 +1008,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			completeOnboarding,
 			openDescription,
 			closeDescription,
+			selectSection,
+			clearSectionError,
 			sharePost,
 			getFeedDeps,
 			syncThemeColor,
@@ -907,7 +1036,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			showTapToPlay,
 			voices,
 			desc,
+			sectionPlayback,
 			candidateQueue,
+			getSpokenTextForPost,
+			getSpokenSectionTitleForPost,
 			updateSettings,
 			save,
 			likePost,
@@ -932,6 +1064,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			completeOnboarding,
 			openDescription,
 			closeDescription,
+			selectSection,
+			clearSectionError,
 			sharePost,
 			getFeedDeps,
 			syncThemeColor,

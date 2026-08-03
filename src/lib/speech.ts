@@ -1360,7 +1360,11 @@ export function tagCaptionLinkWords(
 ): RelatedInSummary[] {
 	const related =
 		options?.related ?? options?.findRelated?.(post) ?? post._relatedInSummary ?? [];
-	post._relatedInSummary = related;
+	// Only cache on the post when discovering summary-related links — section
+	// playback passes an explicit `related` list and must not clobber the sheet.
+	if (options?.related == null) {
+		post._relatedInSummary = related;
+	}
 	if (!related.length) return related;
 
 	const tokens = spans.map((s) => normalizeCaptionToken(s.textContent));

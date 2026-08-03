@@ -77,6 +77,16 @@ export function PostCard({
 	const disliked = app.isDisliked(post.id);
 	const muted = app.settings.muted;
 	const topic = app.appData ? classifyPostTopic(post, app.appData.topicGroups) : null;
+	const spokenText = app.getSpokenText(post);
+	const sectionTitle = app.getSpokenSectionTitle(post);
+	const sectionRelated =
+		app.sectionPlayback && app.sectionPlayback.postId === post.id
+			? app.sectionPlayback.related
+			: undefined;
+	const sectionKey =
+		app.sectionPlayback && app.sectionPlayback.postId === post.id
+			? `${app.sectionPlayback.sectionIndex}:${app.sectionPlayback.text}`
+			: "0";
 
 	useEffect(() => {
 		registerEl?.(post.id, articleRef.current);
@@ -100,19 +110,45 @@ export function PostCard({
 	const buildCaptions = useEffectEvent(() => {
 		const el = captionsRef.current;
 		if (!el || !app.appData) return;
-		buildCaptionWords(el, post.text, post, app.appData, {
+		const text = app.getSpokenText(post);
+		const related =
+			app.sectionPlayback && app.sectionPlayback.postId === post.id
+				? app.sectionPlayback.related
+				: undefined;
+		buildCaptionWords(el, text, post, app.appData, {
 			wikiLang: post.wikiLang || app.settings.wikiLang,
 			langBcp47: app.appData.wikiLanguages.find(
 				(l) => l.code === (post.wikiLang || app.settings.wikiLang)
 			)?.bcp47,
-			findRelated: findRelatedInSummary
+			...(related ? { related } : { findRelated: findRelatedInSummary })
 		});
 	});
 
 	useEffect(() => {
 		buildCaptions();
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- buildCaptions is an Effect Event
-	}, [post.id, post.text, app.appData]);
+	}, [post.id, post.text, spokenText, sectionKey, app.appData]);
+
+	useEffect(() => {
+		const article = articleRef.current;
+		const visual = visualRef.current;
+		if (!article || !visual || !app.appData) return;
+		if (!sectionRelated?.length) return;
+		sectionRelated.forEach((rel) => {
+			const page = getPageById(rel.id) || rel.page;
+			if (page) mediaRef.current.ensureLinkedArticleImage(visual, page);
+		});
+		const caption = captionsRef.current;
+		if (!caption) return;
+		const spans = [...caption.querySelectorAll<HTMLSpanElement>(".caption-word")];
+		spans.forEach((s) => {
+			delete s.dataset.linkId;
+			delete s.dataset.linkTitle;
+			s.classList.remove("caption-link");
+		});
+		buildCaptions();
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- retag when section related arrives
+	}, [sectionKey, sectionRelated]);
 
 	useEffect(() => {
 		const article = articleRef.current;
@@ -200,7 +236,7 @@ export function PostCard({
 		return () => io.disconnect();
 	}, [post.id, onActivate]);
 
-	const wordCount = Math.max(1, post.text.trim().split(/\s+/).filter(Boolean).length);
+	const wordCount = Math.max(1, spokenText.trim().split(/\s+/).filter(Boolean).length);
 	const progress = wordCount > 1 ? (captionIndex / (wordCount - 1)) * 100 : 100;
 
 	const initialFile = normalizeFileTitle(post.thumb);
@@ -417,8 +453,13 @@ export function PostCard({
 						{topic?.label || ""}
 					</p>
 					<h1>{post.title}</h1>
+					{active ? (
+						<p className="sectionLabel" aria-live="polite">
+							{sectionTitle}
+						</p>
+					) : null}
 					<div className="captions" aria-live="polite" ref={captionsRef} />
-					<p className="sr-only">{post.text}</p>
+					<p className="sr-only">{spokenText}</p>
 				</div>
 			</div>
 

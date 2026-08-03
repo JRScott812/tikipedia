@@ -12,7 +12,10 @@ export function DescriptionSheet() {
 		engagement,
 		appData,
 		setPaused,
-		playbackPaused
+		playbackPaused,
+		sectionPlayback,
+		selectSection,
+		clearSectionError
 	} = useApp();
 	const dialogRef = useRef<HTMLDialogElement>(null);
 	const wasPaused = useRef(false);
@@ -32,6 +35,16 @@ export function DescriptionSheet() {
 		closeDescription();
 		if (!wasPaused.current) setPaused(false);
 	};
+
+	const selectedIndex =
+		desc && sectionPlayback && sectionPlayback.postId === desc.post.id
+			? sectionPlayback.sectionIndex
+			: 0;
+
+	const bodyText =
+		desc && sectionPlayback && sectionPlayback.postId === desc.post.id
+			? sectionPlayback.text
+			: desc?.post.text || "";
 
 	return (
 		<dialog
@@ -53,8 +66,59 @@ export function DescriptionSheet() {
 				</button>
 			</div>
 			<p className="descSummary" id="descSummary">
-				{desc?.post.text || ""}
+				{bodyText}
 			</p>
+			{desc ? (
+				<div className="descSections" id="descSections">
+					<p className="descSectionsLabel">Play section</p>
+					{desc.sectionsLoading ? (
+						<p className="descSectionsStatus" role="status">
+							Loading sections…
+						</p>
+					) : null}
+					{desc.sectionError ? (
+						<p className="descSectionsError" role="alert">
+							{desc.sectionError}
+						</p>
+					) : null}
+					<div className="descSectionList" role="list">
+						<button
+							type="button"
+							role="listitem"
+							className="descSectionBtn"
+							aria-pressed={selectedIndex === 0}
+							data-selected={selectedIndex === 0 ? "1" : undefined}
+							onClick={() => {
+								clearSectionError();
+								void selectSection(desc.post, {
+									index: 0,
+									title: "Summary"
+								});
+							}}
+						>
+							Summary
+						</button>
+						{desc.sections.map((section) => (
+							<button
+								key={section.index}
+								type="button"
+								role="listitem"
+								className="descSectionBtn"
+								aria-pressed={selectedIndex === section.index}
+								data-selected={
+									selectedIndex === section.index ? "1" : undefined
+								}
+								onClick={() => {
+									clearSectionError();
+									void selectSection(desc.post, section);
+								}}
+							>
+								{section.title}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
 			<div className="descLinks" id="descLinks">
 				{desc?.related.map((rel) => (
 					<button

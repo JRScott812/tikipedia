@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Post } from "../types/wiki";
-import { apiPageToPost, pickScoredPost, scoreCandidate } from "./wiki";
+import {
+	apiPageToPost,
+	filterTopLevelSections,
+	getSpokenSectionTitle,
+	getSpokenText,
+	htmlToPlainSectionText,
+	isJunkSectionTitle,
+	pickScoredPost,
+	scoreCandidate
+} from "./wiki";
 
 function makePost(partial: Partial<Post> & Pick<Post, "id" | "title">): Post {
 	return {
@@ -90,5 +99,68 @@ describe("scoreCandidate / pickScoredPost", () => {
 		];
 		const picked = pickScoredPost(posts, scoreDeps);
 		expect([1, 2]).toContain(picked?.id);
+	});
+});
+
+describe("filterTopLevelSections / junk filter", () => {
+	it("keeps toclevel 1 headings and drops junk", () => {
+		const sections = filterTopLevelSections([
+			{ toclevel: 1, index: "1", line: "History" },
+			{ toclevel: 2, index: "2", line: "Early years" },
+			{ toclevel: 1, index: "3", line: "References" },
+			{ toclevel: 1, index: "4", line: "See also" },
+			{ toclevel: 1, index: "5", line: "Geography" },
+			{ toclevel: 1, index: "6", line: "External links" }
+		]);
+		expect(sections).toEqual([
+			{ index: 1, title: "History" },
+			{ index: 5, title: "Geography" }
+		]);
+	});
+
+	it("strips HTML from section titles", () => {
+		expect(isJunkSectionTitle("Further reading")).toBe(true);
+		expect(isJunkSectionTitle("History")).toBe(false);
+		const sections = filterTopLevelSections([
+			{ toclevel: 1, index: "1", line: "<i>Culture</i>" }
+		]);
+		expect(sections[0]?.title).toBe("Culture");
+	});
+});
+
+describe("htmlToPlainSectionText", () => {
+	it("strips tags, collapses whitespace, and caps at 600 chars", () => {
+		const plain = htmlToPlainSectionText("<p>Hello   <b>world</b></p>");
+		expect(plain).toBe("Hello world");
+		const long = htmlToPlainSectionText(`<p>${"x".repeat(800)}</p>`);
+		expect(long.length).toBe(600);
+	});
+});
+
+describe("getSpokenText / getSpokenSectionTitle", () => {
+	it("defaults to summary when playback is null or for another post", () => {
+		const post = makePost({ id: 1, title: "A", text: "Summary text here." });
+		expect(getSpokenText(post, null)).toBe("Summary text here.");
+		expect(getSpokenSectionTitle(post, null)).toBe("Summary");
+		expect(
+			getSpokenText(post, {
+				postId: 99,
+				sectionIndex: 2,
+				sectionTitle: "History",
+				text: "Other"
+			})
+		).toBe("Summary text here.");
+	});
+
+	it("uses section playback when it matches the post", () => {
+		const post = makePost({ id: 1, title: "A", text: "Summary text here." });
+		const playback = {
+			postId: 1,
+			sectionIndex: 3,
+			sectionTitle: "History",
+			text: "In 1840 the town grew."
+		};
+		expect(getSpokenText(post, playback)).toBe("In 1840 the town grew.");
+		expect(getSpokenSectionTitle(post, playback)).toBe("History");
 	});
 });

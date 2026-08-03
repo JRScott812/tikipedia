@@ -3,8 +3,10 @@ import { wikiApiBase, wikiSiteHost } from "./profile";
 import { postUrl } from "./routes";
 import { convertCat, isNoiseTopic } from "./topics";
 import type {
+	ArticleSection,
 	Post,
 	RelatedInSummary,
+	SectionPlayback,
 	Settings,
 	WikiLang,
 	WikiLinkRef
@@ -12,12 +14,26 @@ import type {
 
 const WIKI_CACHE_MAX = 200;
 const WIKI_MAX_CONCURRENT = 2;
+const SECTION_TEXT_MAX = 600;
+const SECTION_TEXT_MIN = 20;
 const WIKI_USER_AGENT =
 	"Tikipedia/3.0 (https://github.com/JRScott812/tikipedia; live-feed)";
+
+/** English junk TOC headings hidden from the playable section list. */
+export const JUNK_SECTION_TITLES = new Set([
+	"references",
+	"see also",
+	"external links",
+	"notes",
+	"further reading",
+	"bibliography"
+]);
 
 const wikiQueryCache = new Map<string, Promise<unknown>>();
 const pageCache = new Map<number | string, Post>();
 const summaryLinkRefCache = new Map<string, WikiLinkRef[]>();
+const sectionLinkRefCache = new Map<string, WikiLinkRef[]>();
+const sectionTextCache = new Map<string, string>();
 
 let wikiInFlight = 0;
 const wikiWaiters: Array<() => void> = [];
@@ -56,6 +72,15 @@ interface MwPage {
 	original?: { source?: string };
 }
 
+interface MwParseSection {
+	toclevel?: number;
+	level?: string | number;
+	line?: string;
+	index?: string | number;
+	number?: string;
+	anchor?: string;
+}
+
 interface MwQueryData {
 	query?: {
 		pages?: Record<string, MwPage>;
@@ -64,6 +89,8 @@ interface MwQueryData {
 	};
 	parse?: {
 		wikitext?: { "*": string };
+		text?: { "*": string };
+		sections?: MwParseSection[];
 	};
 }
 
@@ -157,6 +184,8 @@ export function clearLiveCaches(candidateQueue?: Post[]): void {
 	pageCache.clear();
 	wikiQueryCache.clear();
 	summaryLinkRefCache.clear();
+	sectionLinkRefCache.clear();
+	sectionTextCache.clear();
 	if (candidateQueue) candidateQueue.length = 0;
 }
 
@@ -290,6 +319,164 @@ export function parseWikiLinkRefs(wikitext: string | null | undefined): WikiLink
 		refs.push({ target, label });
 	}
 	return refs;
+}
+
+export function isJunkSectionTitle(title: string | null | undefined): boolean {
+	const key = String(title || "")
+		.replace(/<[^>]+>/g, "")
+		.replace(/\s+/g, " ")
+		.trim()
+		.toLowerCase();
+	return JUNK_SECTION_TITLES.has(key);
+}
+
+/** Keep top-level TOC rows; drop English junk headings. */
+export function filterTopLevelSections(
+	raw: Array<{ toclevel?: number; line?: string; index?: string | number }>
+): ArticleSection[] {
+	const out: ArticleSection[] = [];
+	const seen = new Set<number>();
+	for (const s of raw || []) {
+		if (Number(s.toclevel) !== 1) continue;
+		const title = String(s.line || "")
+			.replace(/<[^>]+>/g, "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (!title || isJunkSectionTitle(title)) continue;
+		const index = Number(s.index);
+		if (!Number.isFinite(index) || index < 1 || seen.has(index)) continue;
+		seen.add(index);
+		out.push({ index, title });
+	}
+	return out;
+}
+
+/** Strip MediaWiki HTML extract to plain text and cap length. */
+export function htmlToPlainSectionText(
+	html: string | null | undefined,
+	maxChars = SECTION_TEXT_MAX
+): string {
+	const raw = String(html || "");
+	if (!raw.trim()) return "";
+	let text = "";
+	if (typeof DOMParser !== "undefined") {
+		const doc = new DOMParser().parseFromString(raw, "text/html");
+		text = doc.body?.textContent || "";
+	} else {
+		text = raw.replace(/<[^>]+>/g, " ");
+	}
+	return text.replace(/\s+/g, " ").trim().slice(0, maxChars);
+}
+
+export function getSpokenText(
+	post: Post | null | undefined,
+	playback: SectionPlayback | null | undefined
+): string {
+	if (!post) return "";
+	if (playback && playback.postId === post.id && playback.text) return playback.text;
+	return post.text || "";
+}
+
+export function getSpokenSectionTitle(
+	post: Post | null | undefined,
+	playback: SectionPlayback | null | undefined
+): string {
+	if (post && playback && playback.postId === post.id && playback.sectionTitle) {
+		return playback.sectionTitle;
+	}
+	return "Summary";
+}
+
+export async function fetchTopLevelSections(
+	post: Post,
+	settingsWikiLang: string
+): Promise<ArticleSection[]> {
+	if (!post?.title) return [];
+	if (post._sections) return post._sections;
+	try {
+		const data = (await wikiQuery(
+			{
+				action: "parse",
+				page: post.title,
+				prop: "sections",
+				disablelimitreport: 1
+			},
+			{ settingsWikiLang }
+		)) as MwQueryData;
+		const sections = filterTopLevelSections(data?.parse?.sections || []);
+		post._sections = sections;
+		return sections;
+	} catch (err) {
+		console.warn("fetchTopLevelSections failed", err);
+		post._sections = [];
+		return [];
+	}
+}
+
+export async function fetchSectionPlaintext(
+	post: Post,
+	sectionIndex: number,
+	settingsWikiLang: string
+): Promise<string> {
+	if (!post?.title) return "";
+	if (sectionIndex === 0) return (post.text || "").slice(0, SECTION_TEXT_MAX);
+	const cacheKey = `${settingsWikiLang}:${post.title}:${sectionIndex}`;
+	if (sectionTextCache.has(cacheKey)) return sectionTextCache.get(cacheKey) || "";
+
+	const data = (await wikiQuery(
+		{
+			action: "parse",
+			page: post.title,
+			prop: "text|wikitext",
+			section: sectionIndex,
+			disableeditsection: 1,
+			disablelimitreport: 1
+		},
+		{ settingsWikiLang }
+	)) as MwQueryData;
+
+	const plain = htmlToPlainSectionText(data?.parse?.text?.["*"]);
+	if (plain.length >= SECTION_TEXT_MIN) {
+		sectionTextCache.set(cacheKey, plain);
+	}
+	const wikitext = data?.parse?.wikitext?.["*"] || "";
+	if (wikitext) {
+		sectionLinkRefCache.set(cacheKey, parseWikiLinkRefs(wikitext));
+	}
+	return plain;
+}
+
+export async function ensureSectionLinkRefs(
+	post: Post,
+	sectionIndex: number,
+	settingsWikiLang: string
+): Promise<WikiLinkRef[]> {
+	if (!post?.title) return [];
+	if (sectionIndex === 0) return ensureSummaryLinkRefs(post, settingsWikiLang);
+
+	const cacheKey = `${settingsWikiLang}:${post.title}:${sectionIndex}`;
+	if (sectionLinkRefCache.has(cacheKey)) {
+		return sectionLinkRefCache.get(cacheKey) || [];
+	}
+
+	try {
+		const data = (await wikiQuery(
+			{
+				action: "parse",
+				page: post.title,
+				prop: "wikitext",
+				section: sectionIndex,
+				disablelimitreport: 1
+			},
+			{ settingsWikiLang }
+		)) as MwQueryData;
+		const refs = parseWikiLinkRefs(data?.parse?.wikitext?.["*"] || "");
+		sectionLinkRefCache.set(cacheKey, refs);
+		return refs;
+	} catch {
+		sectionLinkRefCache.set(cacheKey, []);
+		return [];
+	}
 }
 
 export async function ensureSummaryLinkRefs(
@@ -584,8 +771,11 @@ export async function resolvePostLinks(
 	}
 }
 
-export function findRelatedInSummary(post: Post): RelatedInSummary[] {
-	const text = String(post?.text || "").toLowerCase();
+export function findRelatedInSummary(
+	post: Post,
+	opts?: { spokenText?: string; linkRefs?: WikiLinkRef[] }
+): RelatedInSummary[] {
+	const text = String(opts?.spokenText ?? post?.text ?? "").toLowerCase();
 	if (!text || !post) return [];
 	const out: RelatedInSummary[] = [];
 	const seenIds = new Set<number>();
@@ -610,8 +800,9 @@ export function findRelatedInSummary(post: Post): RelatedInSummary[] {
 		out.push({ id: page.id, page, title: page.title, label });
 	};
 
-	// Lead wikitext refs first — labels match spoken extract (piped links).
-	for (const ref of post._summaryLinkRefs || []) {
+	const refs = opts?.linkRefs ?? post._summaryLinkRefs ?? [];
+	// Lead/section wikitext refs first — labels match spoken extract (piped links).
+	for (const ref of refs) {
 		if (!text.includes(String(ref.label).toLowerCase())) continue;
 		const page = getPageByTitle(ref.target);
 		if (page) push(page, ref.label);
@@ -663,6 +854,48 @@ export async function prefetchRelatedThumbs(
 	const related = findRelatedInSummary(post);
 	post._relatedInSummary = related;
 	return related;
+}
+
+/** Prefetch thumbs for links in a chosen section and return related matches for that spoken text. */
+export async function prefetchRelatedForSection(
+	post: Post,
+	settings: Settings,
+	sectionIndex: number,
+	spokenText: string
+): Promise<RelatedInSummary[]> {
+	if (!post) return [];
+	const lang = settings.wikiLang || "simple";
+	const refs = await ensureSectionLinkRefs(post, sectionIndex, lang);
+	const refTargets = refs.map((r) => r.target);
+	const needTitles = [...new Set([...refTargets, ...(post.linkTitles || [])])]
+		.filter((t) => {
+			const page = getPageByTitle(t);
+			return !page || !page.thumb;
+		})
+		.slice(0, 40);
+
+	for (let i = 0; i < needTitles.length; i += 20) {
+		const batch = needTitles.slice(i, i + 20);
+		try {
+			const data = (await wikiQueryForSettings(
+				{
+					action: "query",
+					redirects: 1,
+					titles: batch.join("|"),
+					prop: "pageimages|info",
+					piprop: "thumbnail|name",
+					pithumbsize: 720
+				},
+				settings
+			)) as MwQueryData;
+			const { resolve } = indexQueryPages(data);
+			for (const title of batch) resolve(title);
+		} catch (err) {
+			console.warn("prefetchRelatedForSection failed", err);
+		}
+	}
+
+	return findRelatedInSummary(post, { spokenText, linkRefs: refs });
 }
 
 export async function fetchRandomCandidates(
