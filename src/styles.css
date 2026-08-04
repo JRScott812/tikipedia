@@ -21,6 +21,9 @@
 	--tt-toggle-track: light-dark(#c5c5c5, #3a3a3a);
 	--tt-hover-fill: light-dark(rgba(22, 24, 35, 0.06), hsla(0, 0%, 100%, 0.08));
 	--tt-razzmatazz: #fe2c55;
+	/* Solid fills with white text (Lighthouse contrast ≥ 4.5:1, incl. brightness hover). */
+	--tt-razzmatazz-fill: color-mix(in srgb, var(--tt-razzmatazz) 75%, #000);
+	--tt-danger-fill: color-mix(in srgb, #ff3b5c 75%, #000);
 	--tt-splash: #25f4ee;
 	--tt-press-scale: 0.9;
 	--feed-nav-button-width: 3rem;
@@ -1491,7 +1494,7 @@ body ::backdrop {
 	}
 
 	&:has(input:checked) {
-		background: color-mix(in srgb, var(--tt-razzmatazz) 88%, #000);
+		background: var(--tt-razzmatazz-fill);
 		border-color: transparent;
 		color: #fff;
 
@@ -1533,7 +1536,7 @@ body ::backdrop {
 	border: none;
 	border-radius: 999px;
 	padding: 15px 18px;
-	background: var(--tt-razzmatazz);
+	background: var(--tt-razzmatazz-fill);
 	color: #fff;
 	font: inherit;
 	font-size: 1.05rem;
@@ -1831,7 +1834,7 @@ body[data-onboarding] .feedHeader {
 		font: inherit;
 		font-weight: 700;
 		cursor: pointer;
-		background: var(--tt-razzmatazz);
+		background: var(--tt-razzmatazz-fill);
 		color: #fff;
 
 		&:focus-visible {
@@ -1869,7 +1872,7 @@ body[data-onboarding] .feedHeader {
 		font: inherit;
 		font-weight: 700;
 		cursor: pointer;
-		background: var(--tt-razzmatazz);
+		background: var(--tt-razzmatazz-fill);
 		color: #fff;
 
 		&:focus-visible {
@@ -1898,7 +1901,7 @@ radio-picker {
 
 	label {
 		&:has(input:checked) {
-			background: var(--tt-razzmatazz);
+			background: var(--tt-razzmatazz-fill);
 			color: #fff;
 		}
 
@@ -2138,7 +2141,7 @@ radio-picker {
 	button {
 		cursor: pointer;
 		border: none;
-		background: var(--tt-razzmatazz);
+		background: var(--tt-razzmatazz-fill);
 		font-size: inherit;
 		font-weight: 700;
 		color: #fff;
@@ -2146,7 +2149,7 @@ radio-picker {
 		padding: 13px 16px;
 
 		&.btn-danger {
-			background: #ff3b5c;
+			background: var(--tt-danger-fill);
 			color: #fff;
 		}
 
