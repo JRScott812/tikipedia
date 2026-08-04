@@ -1,3 +1,22 @@
-# Uncompressed dataset: exceeds GitHub's file size limit, generated locally or
-# unpacked from smoldata.json.gz / smoldata.json.br
+# Dependencies & build
+node_modules
+dist
+dist-ssr
+*.local
+
+# Test / tooling
+coverage
+playwright-report
+test-results
+.lighthouseci
+.vite
+*.tsbuildinfo
+
+# Editor
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Legacy uncompressed dataset
 smoldata.json

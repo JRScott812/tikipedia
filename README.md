@@ -1,26 +1,82 @@
-# xikipedia
-Wikipedia as a TikTok-style social media feed
+# Tikipedia
 
-# Try it: [xikipedia.org](https://jrscott812.github.io/xikipedia)
+Wikipedia as a TikTok-style social media feed — React + TypeScript (v3).
+
+# Try it: [https://jrscott812.github.io/tikipedia](https://jrscott812.github.io/tikipedia)
 
 ## About
 
-A modified version of [Xikipedia.org](https://xikipedia.org) but as a TikTok-style social feed, with videos.  All text & images come from the Wikipedia data dumps.  The voice uses the Text-to-Speech (TTS) from the browser/OS and can be changed in the settings.
+A modified version of [Xikipedia.org](https://xikipedia.org) as a TikTok-style social feed. Article text, categories, links, and images are fetched on demand from the [MediaWiki Action API](https://www.mediawiki.org/wiki/API:Main_page) for the Wikipedia language you pick in Settings. Narration uses your browser/OS text-to-speech and auto-selects a matching voice when one is installed.
 
-Once Xikipedia has loaded, it is available fully offline, and you can even install it as an app by clicking the install button.
+Recommendations (likes, watch history, category scores) stay on your device in `localStorage`, stored separately per language. An internet connection is required to load shorts.
 
-## Generating data
+## Prerequisites
 
-To run Xikipedia, you need the .json file that contains the data required. This repo already has a file for the Simple Wikipedia included, but you can also make your own by replacing the files in the `process_data.py` file with your own [WikiMedia data dumps](https://dumps.wikimedia.org/).
+- Node.js 22
+- npm 10+
 
-## Hosting
+## Scripts
 
-The app tries the dataset in this order and uses whichever the host has: `smoldata.json`, then `smoldata.json.gz`, then `smoldata.json.br`. The compressed ones are decompressed in the browser, so the archives are sniffed rather than trusted by extension — a host that sets `Content-Encoding` itself (like nginx serving `smoldata.json.br` as `smoldata.json`) still works.
+| Command                           | Description                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `npm run dev` / `start` / `run`   | Vite development server                                                                |
+| `npm run build`                   | Typecheck + production build (writes `dist/`, including `404.html` for SPA deep links) |
+| `npm run preview`                 | Serve the production build on the host/port in `site.config.json`                      |
+| `npm test`                        | Unit / component tests (Vitest)                                                        |
+| `npm run test:watch`              | Vitest watch mode                                                                      |
+| `npm run test:e2e`                | Playwright browser tests                                                               |
+| `npm run test:lighthouse`         | Lighthouse CI against `vite preview` (needs a prior `build`)                           |
+| `npm run lint` / `lint:fix`       | ESLint                                                                                 |
+| `npm run format` / `format:check` | Prettier                                                                               |
+| `npm run typecheck`               | TypeScript project references check                                                    |
+| `npm run verify`                  | format → lint → typecheck → unit tests → build → e2e → lighthouse                      |
 
-On static hosts such as GitHub Pages, the uncompressed 228MB `smoldata.json` can't be committed (over GitHub's file size limit) and browsers can't decode brotli via `DecompressionStream`, so `smoldata.json.gz` is what gets used. Regenerate it after changing the dataset:
+## Development
 
 ```sh
-gzip -9 -k smoldata.json  # writes smoldata.json.gz
+npm ci
+npm run dev
 ```
 
-Then update `EXPECTED_GZ_SIZE` in `app.js` and `simple` in `version.json` to the new sizes. All paths are relative, so serving from a subdirectory (`user.github.io/xikipedia/`) works without changes.
+[`site.config.json`](site.config.json) is the single source of truth for the deployed origin/base and the preview host/port. Vite, Playwright, Lighthouse CI, and `src/lib/site.ts` all read it, so changing the base path or preview port is a one-line edit.
+
+The app is built for GitHub Pages under that base by default. Override per-build with `VITE_BASE`; for a root deploy, set `VITE_BASE=/`.
+
+## Architecture
+
+- `src/lib/` — typed services (config, routes, profile persistence, MediaWiki client, recommendations, speech, media)
+- `src/context/` — React app state (settings, profiles, feed, playback)
+- `src/components/` + `src/pages/` — UI shell, feed, settings, onboarding, etc.
+- `public/data/` — languages, topics, speech, captions, junk-image patterns
+- `public/icons/` — UI icons
+- PWA assets / service worker are generated by `vite-plugin-pwa` from `package.json` version `3.0.0`
+
+## Open a reel
+
+- **Search:** use the search control in the feed header (OpenSearch against your selected Wikipedia language).
+- **URL:** `/p/{lang}/Article_Title` — e.g. `/p/en/Albert_Einstein` or `/p/simple/Sun`. Spaces as underscores. Legacy `/p/Title` still works and uses your Settings language.
+
+## Hosting / CI
+
+- GitHub Actions **CI** runs `npm run verify` on pushes and pull requests (including Lighthouse CI; reports upload as the `lighthouse-reports` artifact).
+- Lighthouse config lives in [`lighthouserc.cjs`](lighthouserc.cjs) — asserts a11y/SEO floors, warns on performance for the SPA + live Wikimedia feed.
+- **Deploy** builds with `VITE_BASE=/tikipedia/` and publishes `dist/` to GitHub Pages. Requires **Settings → Pages → Source: GitHub Actions**; the legacy "deploy from a branch" mode serves unbuilt source and breaks the app.
+- Production deep-link refreshes use `dist/404.html` (copy of `index.html`) plus the service worker navigation fallback.
+- [`public/robots.txt`](public/robots.txt) and [`public/sitemap.xml`](public/sitemap.xml) ship with the build (app shell routes; article deep links are allowed but not enumerated).
+- Link previews use Open Graph / Twitter tags in [`index.html`](index.html) plus [`public/og-image.png`](public/og-image.png); the client updates title/description/image while browsing posts.
+
+## Languages
+
+Settings → **Wikipedia language** switches the API host (`simple.wikipedia.org`, `en.wikipedia.org`, `es.wikipedia.org`, …). Changing language clears the in-memory feed cache and starts a new live queue for that edition.
+
+## Config data
+
+Large static lists live under [`public/data/`](public/data/) so they can be edited without touching app logic:
+
+| File                           | Contents                                             |
+| ------------------------------ | ---------------------------------------------------- |
+| `public/data/languages.json`   | Wikipedia language picker + range connectors for TTS |
+| `public/data/topics.json`      | Topic groups, noise filters, onboarding categories   |
+| `public/data/speech.json`      | Month/ordinal/number words for date narration        |
+| `public/data/captions.json`    | Caption role colors and labels                       |
+| `public/data/junk-images.json` | Filename patterns to exclude from slideshows         |
