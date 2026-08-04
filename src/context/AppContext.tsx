@@ -644,14 +644,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			}
 			if (!post?.text) return null;
 			post.wikiLang = settingsRef.current.wikiLang || "simple";
-			insertPostAfter(activePostId, post);
+			const activeId = activePostId;
+			// Place at the active index so it overrides the current card instead of
+			// queuing as the next swipe. Previous post shifts down one slot.
+			setPosts((prev) => {
+				const without = prev.filter((p) => p.id !== post!.id);
+				const idx =
+					activeId == null ? -1 : without.findIndex((p) => p.id === activeId);
+				const next =
+					idx < 0
+						? [post!, ...without]
+						: [...without.slice(0, idx), post!, ...without.slice(idx)];
+				postsRef.current = next;
+				return next;
+			});
 			setActivePostId(post.id);
+			setCaptionIndex(0);
+			setSectionPlayback(null);
 			setPlaybackPaused(false);
 			setPlaybackRate(1);
 			void ensurePrefetch();
 			return post;
 		},
-		[changeWikiLang, insertPostAfter, activePostId, ensurePrefetch]
+		[changeWikiLang, activePostId, ensurePrefetch]
 	);
 
 	const unlockSpeech = useCallback(() => {
@@ -770,6 +785,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 					related: post._relatedInSummary
 				});
 				setCaptionIndex(0);
+				setDesc(null);
+				setPlaybackPaused(false);
 				return;
 			}
 
@@ -802,6 +819,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 					related
 				});
 				setCaptionIndex(0);
+				setDesc(null);
+				setPlaybackPaused(false);
 			} catch (err) {
 				console.warn("selectSection failed", err);
 				if (gen !== sectionSelectGen.current) return;

@@ -174,6 +174,15 @@ export function ForYouPage() {
 	// Keep activeEl lookup fresh after registerEl updates the map.
 	void elVersion;
 
+	// When search / deep-link / related jumps to a post, snap it into the viewport
+	// so it overrides the current card instead of sitting one swipe away.
+	useEffect(() => {
+		if (app.activePostId == null) return;
+		const el = postEls.current.get(app.activePostId);
+		if (!el) return;
+		el.scrollIntoView({ behavior: "auto", block: "start" });
+	}, [app.activePostId, elVersion]);
+
 	if (prefetchSettled && app.posts.length === 0) {
 		return (
 			<div className="feedEmpty" id="shortsFeed" role="status">
