@@ -14,7 +14,6 @@ import type {
 
 const WIKI_CACHE_MAX = 200;
 const WIKI_MAX_CONCURRENT = 2;
-const SECTION_TEXT_MAX = 600;
 const SECTION_TEXT_MIN = 20;
 const WIKI_USER_AGENT =
 	"Tikipedia/3.0 (https://github.com/JRScott812/tikipedia; live-feed)";
@@ -351,21 +350,49 @@ export function filterTopLevelSections(
 	return out;
 }
 
-/** Strip MediaWiki HTML extract to plain text and cap length. */
-export function htmlToPlainSectionText(
-	html: string | null | undefined,
-	maxChars = SECTION_TEXT_MAX
-): string {
+/** Remove Wikipedia footnote markers so they are not spoken or captioned. */
+export function stripWikiCitations(text: string | null | undefined): string {
+	return String(text || "")
+		.replace(/\[\s*\d+\s*\]/g, "")
+		.replace(
+			/\[\s*(?:note|nb|citation needed|page needed|better source needed)[^\]]*\]/gi,
+			""
+		)
+		.replace(/\[\s*[a-z]\s*\]/gi, "")
+		.replace(/\s+([.,;:!?])/g, "$1")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function removeReferenceNodes(root: ParentNode): void {
+	root.querySelectorAll(
+		"sup.reference, span.mw-ref, span[typeof='mw:Extension/ref'], span.reference"
+	).forEach((el) => el.remove());
+	root.querySelectorAll("sup").forEach((sup) => {
+		const t = (sup.textContent || "").trim();
+		if (
+			sup.querySelector('a[href^="#cite"], a[href*="cite_note"]') ||
+			/^\[\d+\]$/.test(t) ||
+			/^\[\d+\](?:\[\d+\])+$/.test(t)
+		) {
+			sup.remove();
+		}
+	});
+}
+
+/** Strip MediaWiki HTML extract to plain text (full section body). */
+export function htmlToPlainSectionText(html: string | null | undefined): string {
 	const raw = String(html || "");
 	if (!raw.trim()) return "";
 	let text = "";
 	if (typeof DOMParser !== "undefined") {
 		const doc = new DOMParser().parseFromString(raw, "text/html");
+		if (doc.body) removeReferenceNodes(doc.body);
 		text = doc.body?.textContent || "";
 	} else {
-		text = raw.replace(/<[^>]+>/g, " ");
+		text = raw.replace(/<sup\b[^>]*>[\s\S]*?<\/sup>/gi, " ").replace(/<[^>]+>/g, " ");
 	}
-	return text.replace(/\s+/g, " ").trim().slice(0, maxChars);
+	return stripWikiCitations(text);
 }
 
 export function getSpokenText(
@@ -419,7 +446,7 @@ export async function fetchSectionPlaintext(
 	settingsWikiLang: string
 ): Promise<string> {
 	if (!post?.title) return "";
-	if (sectionIndex === 0) return (post.text || "").slice(0, SECTION_TEXT_MAX);
+	if (sectionIndex === 0) return post.text || "";
 	const cacheKey = `${settingsWikiLang}:${post.title}:${sectionIndex}`;
 	if (sectionTextCache.has(cacheKey)) return sectionTextCache.get(cacheKey) || "";
 

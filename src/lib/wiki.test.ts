@@ -8,7 +8,8 @@ import {
 	htmlToPlainSectionText,
 	isJunkSectionTitle,
 	pickScoredPost,
-	scoreCandidate
+	scoreCandidate,
+	stripWikiCitations
 } from "./wiki";
 
 function makePost(partial: Partial<Post> & Pick<Post, "id" | "title">): Post {
@@ -129,11 +130,24 @@ describe("filterTopLevelSections / junk filter", () => {
 });
 
 describe("htmlToPlainSectionText", () => {
-	it("strips tags, collapses whitespace, and caps at 600 chars", () => {
+	it("strips tags and collapses whitespace without a length cap", () => {
 		const plain = htmlToPlainSectionText("<p>Hello   <b>world</b></p>");
 		expect(plain).toBe("Hello world");
 		const long = htmlToPlainSectionText(`<p>${"x".repeat(800)}</p>`);
-		expect(long.length).toBe(600);
+		expect(long.length).toBe(800);
+	});
+
+	it("removes citation markers from section HTML and plain text", () => {
+		const html = htmlToPlainSectionText(
+			`<p>The city grew rapidly<sup class="reference"><a href="#cite_note-1">[1]</a></sup> after 1840.<sup id="cite_ref-2"><a href="#cite_note-2">[2]</a></sup></p>`
+		);
+		expect(html).toBe("The city grew rapidly after 1840.");
+		expect(html).not.toMatch(/\[\d+\]/);
+
+		const chained = stripWikiCitations(
+			"Trade expanded[1][2][3] in the 1800s.[note 1]"
+		);
+		expect(chained).toBe("Trade expanded in the 1800s.");
 	});
 });
 
