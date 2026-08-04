@@ -1563,7 +1563,8 @@ export function autoMatchVoiceForLang(input: AutoMatchVoiceInput): AutoMatchVoic
 		return { voiceURI, voiceAutoMatched, matched: null, skipped: true };
 	}
 	const list =
-		voices ?? (typeof speechSynthesis !== "undefined" ? speechSynthesis.getVoices() : []);
+		voices ??
+		(typeof speechSynthesis !== "undefined" ? speechSynthesis.getVoices() : []);
 	// Browsers often report [] until voiceschanged — never wipe a saved voiceURI then.
 	if (!list.length) {
 		return { voiceURI, voiceAutoMatched, matched: null, skipped: true };
