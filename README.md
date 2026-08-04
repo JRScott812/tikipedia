@@ -12,7 +12,7 @@ Recommendations (likes, watch history, category scores) stay on your device in `
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 22
 - npm 10+
 
 ## Scripts
