@@ -986,9 +986,58 @@ export function captionWordWeight(raw: string | null | undefined): number {
 	if (!token) return 1;
 	const digits = (token.match(/\d/g) || []).length;
 	const letters = token.replace(/[^A-Za-z]/g, "").length;
+	const spokenWords = token.split(/\s+/).filter(Boolean).length;
 	let weight = 1 + digits * 0.55 + Math.max(0, letters - 6) * 0.08;
 	if (digits >= 4 && /[-–—/]/.test(token)) weight += 0.8;
-	return Math.min(weight, 6);
+	// Expanded speak forms ("March fifteenth, nineteen ninety-nine") need multi-word time.
+	if (spokenWords > 1) weight = Math.max(weight, spokenWords * 1.25);
+	return Math.min(weight, 8);
+}
+
+/** Prefer `data-speak` so date/year expansions drive karaoke timing on mobile. */
+export function captionTokenWeight(
+	word: {
+		textContent?: string | null;
+		dataset?: { speak?: string | null } | DOMStringMap;
+	} | null
+): number {
+	if (!word) return 1;
+	const spoken = String(word.dataset?.speak ?? word.textContent ?? "");
+	return captionWordWeight(spoken);
+}
+
+/** Per-token delay for timed karaoke (used when speech boundaries are missing). */
+export function captionStepMs(
+	word: {
+		textContent?: string | null;
+		dataset?: { speak?: string | null } | DOMStringMap;
+	} | null,
+	playbackRate: number,
+	speechRate: number,
+	opts?: { mobile?: boolean }
+): number {
+	const effective = Math.max(
+		0.5,
+		Math.min(2, (Number(speechRate) || 1) * (Number(playbackRate) || 1))
+	);
+	// Mobile voices are often slower than desktop; bias timing slightly longer.
+	const base = (opts?.mobile ? 360 : 310) / effective;
+	return Math.max(90, base * captionTokenWeight(word));
+}
+
+/** iOS/iPadOS Web Speech rarely fires reliable word boundary events. */
+export function prefersTimedCaptionSync(): boolean {
+	if (typeof navigator === "undefined") return false;
+	const ua = navigator.userAgent || "";
+	if (/iPhone|iPad|iPod/i.test(ua)) return true;
+	// iPadOS 13+ can report as MacIntel with touch.
+	if (
+		typeof navigator.platform === "string" &&
+		navigator.platform === "MacIntel" &&
+		(navigator.maxTouchPoints || 0) > 1
+	)
+		return true;
+	return false;
 }
 
 /**
@@ -1107,16 +1156,20 @@ export function speakDecadeEn(token: string, data: SpeechData): string | null {
 }
 
 export function stripTrailingPunct(token: string): { core: string; punct: string } {
-	const m = String(token).match(/^(.*?)([.,;:!?]+)?$/);
-	return { core: m?.[1] ?? token, punct: m?.[2] || "" };
+	const trimmed = String(token || "").trim();
+	const m = trimmed.match(/^(.*?)([.,;:!?]+)?$/);
+	return { core: m?.[1] ?? trimmed, punct: m?.[2] || "" };
 }
 
 export function isMonthToken(token: string, monthNamesEn: string[]): boolean {
 	const core = stripTrailingPunct(token).core.toLowerCase().replace(/\.$/, "");
-	return (
-		monthNamesEn.includes(core) ||
-		monthNamesEn.some((m) => m.startsWith(core) && core.length >= 3)
-	);
+	if (!core) return false;
+	return monthNamesEn.some((m) => {
+		const month = String(m || "")
+			.toLowerCase()
+			.replace(/\.$/, "");
+		return month === core || (core.length >= 3 && month.startsWith(core));
+	});
 }
 
 export function isDateContext(
@@ -1197,7 +1250,9 @@ export function tokenSpeechForm(
 		if (isMonthToken(core, data.monthNamesEn)) {
 			const dayTok = tokens[index + 1];
 			const yearTok = tokens[index + 2];
-			const day = stripTrailingPunct(dayTok || "").core.replace(/,/g, "");
+			const day = stripTrailingPunct(dayTok || "")
+				.core.replace(/,/g, "")
+				.replace(/(?:st|nd|rd|th)$/i, "");
 			const year = stripTrailingPunct(yearTok || "").core;
 			if (/^\d{1,2}$/.test(day) && /^\d{3,4}$/.test(year)) {
 				const ord = data.ordinalWords[String(Number(day))] || day;
@@ -1211,13 +1266,14 @@ export function tokenSpeechForm(
 
 		// D Month YYYY
 		if (
-			/^\d{1,2}$/.test(core) &&
+			/^\d{1,2}(?:st|nd|rd|th)?$/i.test(core) &&
 			isMonthToken(tokens[index + 1] || "", data.monthNamesEn)
 		) {
+			const dayNum = core.replace(/(?:st|nd|rd|th)$/i, "");
 			const month = stripTrailingPunct(tokens[index + 1] || "").core;
 			const yearTok = tokens[index + 2];
 			const year = stripTrailingPunct(yearTok || "").core;
-			const ord = data.ordinalWords[String(Number(core))] || core;
+			const ord = data.ordinalWords[String(Number(dayNum))] || dayNum;
 			if (/^\d{3,4}$/.test(year))
 				return `${ord} of ${month} ${speakYearEn(year, data)} `;
 			return `${ord} of ${month}${punct || ""} `;
@@ -1262,7 +1318,9 @@ export function annotateSpeechTokens(
 			isEnglishSpeechLang(wikiLang) &&
 			isMonthToken(stripTrailingPunct(display[i]!).core, data.monthNamesEn)
 		) {
-			const day = stripTrailingPunct(display[i + 1] || "").core.replace(/,/g, "");
+			const day = stripTrailingPunct(display[i + 1] || "")
+				.core.replace(/,/g, "")
+				.replace(/(?:st|nd|rd|th)$/i, "");
 			const year = stripTrailingPunct(display[i + 2] || "").core;
 			if (/^\d{1,2}$/.test(day)) {
 				const extras = [i + 1];
@@ -1271,7 +1329,7 @@ export function annotateSpeechTokens(
 			}
 		} else if (
 			isEnglishSpeechLang(wikiLang) &&
-			/^\d{1,2}$/.test(stripTrailingPunct(display[i]!).core) &&
+			/^\d{1,2}(?:st|nd|rd|th)?$/i.test(stripTrailingPunct(display[i]!).core) &&
 			isMonthToken(display[i + 1] || "", data.monthNamesEn)
 		) {
 			const extras = [i + 1];
@@ -1586,7 +1644,9 @@ export class SpeechController {
 	private usingBoundarySync = false;
 	private captionTimer: ReturnType<typeof setTimeout> | null = null;
 	private shortLoopTimer: ReturnType<typeof setTimeout> | null = null;
+	private speechKeepAlive: ReturnType<typeof setInterval> | null = null;
 	private lastFallbackText = "";
+	private timedOnly = false;
 
 	constructor(private readonly cb: SpeechControllerCallbacks) {}
 
@@ -1605,8 +1665,29 @@ export class SpeechController {
 		}
 	}
 
+	private stopSpeechKeepAlive(): void {
+		if (this.speechKeepAlive) {
+			clearInterval(this.speechKeepAlive);
+			this.speechKeepAlive = null;
+		}
+	}
+
+	/** iOS often pauses synthesis mid-utterance; nudge it awake while speaking. */
+	private startSpeechKeepAlive(): void {
+		this.stopSpeechKeepAlive();
+		if (!this.timedOnly || typeof speechSynthesis === "undefined") return;
+		this.speechKeepAlive = setInterval(() => {
+			try {
+				if (speechSynthesis.speaking) speechSynthesis.resume();
+			} catch {
+				/* ignore */
+			}
+		}, 4000);
+	}
+
 	stopPlayback(): void {
 		this.stopCaptionTimer();
+		this.stopSpeechKeepAlive();
 		if (this.shortLoopTimer) {
 			clearTimeout(this.shortLoopTimer);
 			this.shortLoopTimer = null;
@@ -1649,10 +1730,16 @@ export class SpeechController {
 		this.stopCaptionTimer();
 		if (!words.length) return;
 		this.captionWords = words;
-		const msPerWord = Math.max(120, 280 / (rate || 1));
+		const speechRate = this.cb.getSpeechRate?.() || 1;
+		const mobile = this.timedOnly || prefersTimedCaptionSync();
 		let i = Math.max(0, Math.min(fromIndex, words.length - 1));
 		this.highlightCaptionWord(i);
 		const step = () => {
+			// Boundary sync took over — stop the clock.
+			if (this.usingBoundarySync) {
+				this.stopCaptionTimer();
+				return;
+			}
 			i++;
 			if (i >= words.length) {
 				this.stopCaptionTimer();
@@ -1669,12 +1756,12 @@ export class SpeechController {
 			this.highlightCaptionWord(i);
 			this.captionTimer = setTimeout(
 				step,
-				msPerWord * captionWordWeight(words[i]!.textContent)
+				captionStepMs(words[i]!, rate, speechRate, { mobile })
 			);
 		};
 		this.captionTimer = setTimeout(
 			step,
-			msPerWord * captionWordWeight(words[i]!.textContent)
+			captionStepMs(words[i]!, rate, speechRate, { mobile })
 		);
 	}
 
@@ -1748,8 +1835,11 @@ export class SpeechController {
 		});
 		this.currentUtterance = utter;
 		this.usingBoundarySync = false;
+		this.timedOnly = prefersTimedCaptionSync();
 
 		utter.onboundary = (ev) => {
+			// iOS/iPadOS boundaries are missing or unreliable — stay on timed sync.
+			if (this.timedOnly) return;
 			if (ev.name && ev.name !== "word") return;
 			this.usingBoundarySync = true;
 			this.stopCaptionTimer();
@@ -1762,6 +1852,7 @@ export class SpeechController {
 			if (this.currentUtterance !== utter) return;
 			this.currentUtterance = null;
 			this.stopCaptionTimer();
+			this.stopSpeechKeepAlive();
 			if (words.length) this.highlightCaptionWord(words.length - 1);
 			this.scheduleShortLoop();
 			this.cb.onEnd?.();
@@ -1769,20 +1860,15 @@ export class SpeechController {
 		utter.onerror = () => {
 			if (this.currentUtterance !== utter) return;
 			this.currentUtterance = null;
+			this.stopSpeechKeepAlive();
 			if (!this.usingBoundarySync) this.startTimedCaptions(words, rate, baseIndex);
 		};
 
 		speechSynthesis.speak(utter);
-		// Fallback if boundary events never fire
-		setTimeout(() => {
-			if (
-				this.currentUtterance === utter &&
-				!this.usingBoundarySync &&
-				!this.paused &&
-				!this.cb.getMuted()
-			)
-				this.startTimedCaptions(words, rate, baseIndex);
-		}, 400);
+		this.startSpeechKeepAlive();
+		// Drive karaoke from spoken-form timing immediately. Desktop can switch to
+		// boundary sync when word events arrive; mobile stays on this clock.
+		this.startTimedCaptions(words, rate, baseIndex);
 	}
 
 	/** speechSynthesis.pause() is unreliable — cancel and remember the word. */
