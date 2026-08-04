@@ -26,7 +26,8 @@ export function defaultSettings(): Settings {
 		speechRate: 1,
 		voiceAutoMatched: true,
 		captionSize: 1,
-		captionStroke: 2
+		captionStroke: 2,
+		onboardingCompleted: false
 	};
 }
 
@@ -63,17 +64,32 @@ export function loadSettings(wikiLanguages: WikiLang[]): Settings {
 	computed.captionSize = clampCaptionSize(computed.captionSize);
 	computed.captionStroke = clampCaptionStroke(computed.captionStroke);
 	if (!Array.isArray(computed.profiles)) computed.profiles = ["default"];
+	computed.storeData = computed.storeData !== false;
+	computed.openMainWiki = !!computed.openMainWiki;
+	computed.muted = !!computed.muted;
+	computed.voiceAutoMatched = computed.voiceAutoMatched !== false;
+	computed.onboardingCompleted = !!computed.onboardingCompleted;
+	if (typeof computed.voiceURI !== "string") computed.voiceURI = "";
+	if (typeof computed.theme !== "string" || !computed.theme)
+		computed.theme = "theme-auto";
+	const rate = Number(computed.speechRate);
+	computed.speechRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
 	return computed;
 }
 
 /** Persist settings to localStorage (caller supplies the full Settings object). */
 export function saveSettings(settings: Settings): void {
-	const next: Settings = {
-		...settings,
-		captionSize: clampCaptionSize(settings.captionSize),
-		captionStroke: clampCaptionStroke(settings.captionStroke)
-	};
-	localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+	try {
+		const next: Settings = {
+			...settings,
+			captionSize: clampCaptionSize(settings.captionSize),
+			captionStroke: clampCaptionStroke(settings.captionStroke),
+			onboardingCompleted: !!settings.onboardingCompleted
+		};
+		localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+	} catch (err) {
+		console.warn("saveSettings failed", err);
+	}
 }
 
 export function getWikiLangInfo(
@@ -249,7 +265,11 @@ export function saveProfile(
 	storeData: boolean
 ): void {
 	if (!storeData) return;
-	localStorage.setItem(profileKey(profileId), JSON.stringify(profileStore));
+	try {
+		localStorage.setItem(profileKey(profileId), JSON.stringify(profileStore));
+	} catch (err) {
+		console.warn("saveProfile failed", err);
+	}
 }
 
 /** Ensure profiles list / active id are valid, then load the active profile. */

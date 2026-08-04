@@ -1562,15 +1562,21 @@ export function autoMatchVoiceForLang(input: AutoMatchVoiceInput): AutoMatchVoic
 	if (typeof speechSynthesis === "undefined" && !voices) {
 		return { voiceURI, voiceAutoMatched, matched: null, skipped: true };
 	}
+	const list =
+		voices ?? (typeof speechSynthesis !== "undefined" ? speechSynthesis.getVoices() : []);
+	// Browsers often report [] until voiceschanged — never wipe a saved voiceURI then.
+	if (!list.length) {
+		return { voiceURI, voiceAutoMatched, matched: null, skipped: true };
+	}
 	if (!force && voiceAutoMatched === false && voiceURI) {
 		return {
 			voiceURI,
 			voiceAutoMatched,
-			matched: pickBestVoiceForLang(bcp47, voices),
+			matched: pickBestVoiceForLang(bcp47, list),
 			skipped: true
 		};
 	}
-	const best = pickBestVoiceForLang(bcp47, voices);
+	const best = pickBestVoiceForLang(bcp47, list);
 	return {
 		voiceURI: best ? best.voiceURI : "",
 		voiceAutoMatched: true,

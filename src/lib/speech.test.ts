@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
+	autoMatchVoiceForLang,
 	buildCaptionWords,
 	captionStepMs,
 	captionTokenWeight,
@@ -182,5 +183,40 @@ describe("SpeechController pause/resume", () => {
 
 		controller.pause();
 		expect(controller.isPaused()).toBe(true);
+	});
+});
+
+describe("autoMatchVoiceForLang", () => {
+	it("skips when the voice list is empty so saved voiceURI is kept", () => {
+		const result = autoMatchVoiceForLang({
+			force: true,
+			bcp47: "en",
+			voiceURI: "saved-voice",
+			voiceAutoMatched: true,
+			voices: []
+		});
+		expect(result.skipped).toBe(true);
+		expect(result.voiceURI).toBe("saved-voice");
+	});
+
+	it("matches a voice when the list is available", () => {
+		const voices = [
+			{
+				voiceURI: "en-us",
+				name: "English",
+				lang: "en-US",
+				default: true,
+				localService: true
+			} as SpeechSynthesisVoice
+		];
+		const result = autoMatchVoiceForLang({
+			force: true,
+			bcp47: "en",
+			voiceURI: "",
+			voiceAutoMatched: true,
+			voices
+		});
+		expect(result.skipped).toBe(false);
+		expect(result.voiceURI).toBe("en-us");
 	});
 });

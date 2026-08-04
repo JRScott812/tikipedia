@@ -216,6 +216,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const profileNameRef = useRef(profileName);
 	const prefetchBusy = useRef(false);
 	const speechUnlockedRef = useRef(speechUnlocked);
+	/** False until bootstrap finishes loadSettings — blocks accidental default overwrites. */
+	const settingsHydrated = useRef(false);
+	const voicesListenerRef = useRef<(() => void) | null>(null);
+	const bootstrapGen = useRef(0);
 
 	useEffect(() => {
 		settingsRef.current = settings;
@@ -283,6 +287,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	const save = useCallback(() => {
+		if (!settingsHydrated.current) return;
 		const s = settingsRef.current;
 		saveSettings(s);
 		if (!s.storeData) return;
@@ -310,7 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				const next = { ...prev, ...patch };
 				settingsRef.current = next;
 				applyCaptionVars(next);
-				saveSettings(next);
+				if (settingsHydrated.current) saveSettings(next);
 				queueMicrotask(() => syncThemeColor());
 				return next;
 			});
@@ -712,6 +717,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 					console.warn("onboarding hydrate failed", err);
 				}
 			}
+			const nextSettings = {
+				...settingsRef.current,
+				onboardingCompleted: true
+			};
+			settingsRef.current = nextSettings;
+			setSettings(nextSettings);
+			saveSettings(nextSettings);
 			setOnboardingDone(true);
 			delete document.body.dataset.onboarding;
 			setSpeechUnlocked(true);
@@ -860,31 +872,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	}, [voices]);
 
 	const bootstrap = useEffectEvent(async () => {
+		const gen = ++bootstrapGen.current;
 		try {
 			setLoadFailed(false);
 			setLoadingText("loading config…");
 			const data = await loadAppData();
+			if (gen !== bootstrapGen.current) return;
 			setAppData(data);
 			appDataRef.current = data;
 
 			const s = loadSettings(data.wikiLanguages);
 			setSettings(s);
 			settingsRef.current = s;
+			settingsHydrated.current = true;
 			applyCaptionVars(s);
 
 			setLoadingText("loading profile");
 			const loaded = initProfile(s);
-			let hasSeen = false;
+			let onboardingDoneNow = !!s.onboardingCompleted;
 			if (loaded) {
-				setSettings(loaded.settings);
-				settingsRef.current = loaded.settings;
+				let nextSettings = loaded.settings;
+				// Returning users who watched shorts before onboardingCompleted existed.
+				if (!nextSettings.onboardingCompleted && loaded.hasSeenPosts) {
+					nextSettings = { ...nextSettings, onboardingCompleted: true };
+					saveSettings(nextSettings);
+				}
+				setSettings(nextSettings);
+				settingsRef.current = nextSettings;
 				setProfileStore(loaded.profileStore);
 				profileStoreRef.current = loaded.profileStore;
 				setProfileName(loaded.profileName);
 				const eng = applySliceToEngagement(loaded.slice, loaded.timeSpentTotal);
 				engagementRef.current = eng;
 				setEngagement(eng);
-				hasSeen = loaded.hasSeenPosts;
+				onboardingDoneNow = !!nextSettings.onboardingCompleted;
 			} else {
 				const slice = defaultLangSlice();
 				const eng = applySliceToEngagement({ ...slice, likesLen: 0 }, 0);
@@ -892,10 +913,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				setEngagement(eng);
 			}
 
+			if (gen !== bootstrapGen.current) return;
+
+			voicesListenerRef.current?.();
+			voicesListenerRef.current = null;
 			if (typeof speechSynthesis !== "undefined") {
 				const refreshVoices = () => {
 					const list = speechSynthesis.getVoices();
 					setVoices(list);
+					if (!settingsHydrated.current) {
+						updateVoiceNote(settingsRef.current, list);
+						return;
+					}
 					const matched = autoMatchVoiceForLang({
 						force: settingsRef.current.voiceAutoMatched !== false,
 						bcp47:
@@ -921,10 +950,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				};
 				refreshVoices();
 				speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+				voicesListenerRef.current = () =>
+					speechSynthesis.removeEventListener("voiceschanged", refreshVoices);
 			}
 
 			setReady(true);
-			if (hasSeen) {
+			if (onboardingDoneNow) {
 				setOnboardingDone(true);
 				delete document.body.dataset.onboarding;
 			} else {
@@ -933,6 +964,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			}
 			syncThemeColor();
 		} catch (err) {
+			if (gen !== bootstrapGen.current) return;
 			console.error("bootstrap failed", err);
 			setLoadingText("Couldn't load Tikipedia.");
 			setLoadFailed(true);
@@ -948,6 +980,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// that re-fires bootstrap after every setState and hits "Maximum update depth".
 	useEffect(() => {
 		void bootstrap();
+		return () => {
+			bootstrapGen.current += 1;
+			voicesListenerRef.current?.();
+			voicesListenerRef.current = null;
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only bootstrap
 	}, []);
 

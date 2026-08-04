@@ -20,6 +20,8 @@ export interface Settings {
 	voiceAutoMatched: boolean;
 	captionSize: number;
 	captionStroke: number;
+	/** True after the user finishes (or skips) the start-screen topics picker. */
+	onboardingCompleted: boolean;
 }
 
 /** Per-language recommendation / engagement slice. */

@@ -22,7 +22,8 @@ async function seedReturningUser(page: Page) {
 			speechRate: 1,
 			voiceAutoMatched: true,
 			captionSize: 1,
-			captionStroke: 2
+			captionStroke: 2,
+			onboardingCompleted: true
 		};
 		localStorage.setItem("tikipedia-settings", JSON.stringify(settings));
 		localStorage.setItem(

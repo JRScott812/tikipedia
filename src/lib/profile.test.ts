@@ -37,12 +37,42 @@ describe("settings persistence", () => {
 		saveSettings({
 			...defaultSettings(),
 			wikiLang: "zz",
-			captionSize: 1.2
+			captionSize: 1.2,
+			theme: "theme-dark",
+			onboardingCompleted: true
 		});
 		const loaded = loadSettings(langs);
 		expect(loaded.wikiLang).toBe("simple");
 		expect(loaded.captionSize).toBe(1.2);
+		expect(loaded.theme).toBe("theme-dark");
+		expect(loaded.onboardingCompleted).toBe(true);
 		expect(localStorage.getItem(SETTINGS_KEY)).toBeTruthy();
+	});
+
+	it("keeps preferences across a simulated reload", () => {
+		saveSettings({
+			...defaultSettings(),
+			wikiLang: "en",
+			theme: "theme-light",
+			speechRate: 1.2,
+			muted: true,
+			openMainWiki: true,
+			captionSize: 1.3,
+			captionStroke: 3.5,
+			onboardingCompleted: true
+		});
+		const again = loadSettings(langs);
+		expect(again).toMatchObject({
+			wikiLang: "en",
+			theme: "theme-light",
+			speechRate: 1.2,
+			muted: true,
+			openMainWiki: true,
+			captionSize: 1.3,
+			captionStroke: 3.5,
+			onboardingCompleted: true,
+			storeData: true
+		});
 	});
 });
 
