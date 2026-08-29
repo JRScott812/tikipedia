@@ -650,16 +650,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			if (!post?.text) return null;
 			post.wikiLang = settingsRef.current.wikiLang || "simple";
 			const activeId = activePostId;
-			// Place at the active index so it overrides the current card instead of
-			// queuing as the next swipe. Previous post shifts down one slot.
+			// Insert immediately after the current active card so the feed scrolls
+			// directly to it rather than placing it above the visible card.
 			setPosts((prev) => {
 				const without = prev.filter((p) => p.id !== post!.id);
 				const idx =
 					activeId == null ? -1 : without.findIndex((p) => p.id === activeId);
-				const next =
-					idx < 0
-						? [post!, ...without]
-						: [...without.slice(0, idx), post!, ...without.slice(idx)];
+				const insertAt = idx < 0 ? 0 : idx + 1;
+				const next = [
+					...without.slice(0, insertAt),
+					post!,
+					...without.slice(insertAt)
+				];
 				postsRef.current = next;
 				return next;
 			});
