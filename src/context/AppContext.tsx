@@ -650,8 +650,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			if (!post?.text) return null;
 			post.wikiLang = settingsRef.current.wikiLang || "simple";
 			const activeId = activePostId;
-			// Place at the active index so it overrides the current card instead of
-			// queuing as the next swipe. Previous post shifts down one slot.
+			// Place at the active index so it becomes the visible card immediately.
+			// The previous card shifts down one slot.
 			setPosts((prev) => {
 				const without = prev.filter((p) => p.id !== post!.id);
 				const idx =

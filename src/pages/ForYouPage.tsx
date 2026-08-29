@@ -174,13 +174,19 @@ export function ForYouPage() {
 	// Keep activeEl lookup fresh after registerEl updates the map.
 	void elVersion;
 
-	// When search / deep-link / related jumps to a post, snap it into the viewport
-	// so it overrides the current card instead of sitting one swipe away.
+	// When search / deep-link / related jumps to a post, snap it into the viewport.
+	// Retry via rAF in case the new card hasn't mounted yet when activePostId changes.
 	useEffect(() => {
 		if (app.activePostId == null) return;
-		const el = postEls.current.get(app.activePostId);
-		if (!el) return;
-		el.scrollIntoView({ behavior: "auto", block: "start" });
+		const snap = () => {
+			const el = postEls.current.get(app.activePostId!);
+			if (el) {
+				el.scrollIntoView({ behavior: "auto", block: "start" });
+			}
+		};
+		snap();
+		const raf = requestAnimationFrame(snap);
+		return () => cancelAnimationFrame(raf);
 	}, [app.activePostId, elVersion]);
 
 	if (prefetchSettled && app.posts.length === 0) {
