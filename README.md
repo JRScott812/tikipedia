@@ -17,19 +17,19 @@ Recommendations (likes, watch history, category scores) stay on your device in `
 
 ## Scripts
 
-| Command                           | Description                                                                             |
-| --------------------------------- | --------------------------------------------------------------------------------------- |
-| `npm run dev` / `start` / `run`   | Vite development server                                                                 |
-| `npm run build`                   | Typecheck + production build (writes `dist/`, including `404.html` for SPA deep links)  |
-| `npm run preview`                 | Serve the production build on the host/port in `site.config.json`                       |
-| `npm test`                        | Unit / component tests (Vitest)                                                         |
-| `npm run test:watch`              | Vitest watch mode                                                                       |
-| `npm run test:e2e`                | Playwright browser tests                                                                |
-| `npm run test:lighthouse`         | Lighthouse CI against `vite preview` (needs a prior `build`)                            |
-| `npm run lint` / `lint:fix`       | ESLint                                                                                  |
-| `npm run format` / `format:check` | Prettier                                                                                |
-| `npm run typecheck`               | TypeScript project references check                                                     |
-| `npm run verify`                  | format:check → lint → typecheck → test → build → e2e → lighthouse (full CI gate)        |
+| Command                           | Description                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `npm run dev` / `start` / `run`   | Vite development server                                                                |
+| `npm run build`                   | Typecheck + production build (writes `dist/`, including `404.html` for SPA deep links) |
+| `npm run preview`                 | Serve the production build on the host/port in `site.config.json`                      |
+| `npm test`                        | Unit / component tests (Vitest)                                                        |
+| `npm run test:watch`              | Vitest watch mode                                                                      |
+| `npm run test:e2e`                | Playwright browser tests                                                               |
+| `npm run test:lighthouse`         | Lighthouse CI against `vite preview` (needs a prior `build`)                           |
+| `npm run lint` / `lint:fix`       | ESLint                                                                                 |
+| `npm run format` / `format:check` | Prettier                                                                               |
+| `npm run typecheck`               | TypeScript project references check                                                    |
+| `npm run verify`                  | format:check → lint → typecheck → test → build → e2e → lighthouse (full CI gate)       |
 
 ## Development
 
@@ -54,15 +54,15 @@ The app is built for GitHub Pages under that base by default. Override per-build
 
 ## Pages
 
-| Route | Description |
-| --- | --- |
-| `/` | **For You** — vertical short-form feed, auto-narrated |
-| `/following` | **Following** — topic interests inferred from likes and watch time |
-| `/profiles` | **Profiles** — switch or manage multiple local profiles |
-| `/stats` | **Stats** — watch time, top/bottom categories, liked/disliked articles |
-| `/settings` | **Settings** — language, voice, captions, data storage, appearance |
-| `/about` | **About** — app info and credits |
-| `/p/{lang}/{Title}` | Article deep link — opens a specific Wikipedia article as a reel |
+| Route               | Description                                                            |
+| ------------------- | ---------------------------------------------------------------------- |
+| `/`                 | **For You** — vertical short-form feed, auto-narrated                  |
+| `/following`        | **Following** — topic interests inferred from likes and watch time     |
+| `/profiles`         | **Profiles** — switch or manage multiple local profiles                |
+| `/stats`            | **Stats** — watch time, top/bottom categories, liked/disliked articles |
+| `/settings`         | **Settings** — language, voice, captions, data storage, appearance     |
+| `/about`            | **About** — app info and credits                                       |
+| `/p/{lang}/{Title}` | Article deep link — opens a specific Wikipedia article as a reel       |
 
 ## Opening a specific article
 
