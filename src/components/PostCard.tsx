@@ -1,4 +1,5 @@
 import {
+	useCallback,
 	useEffect,
 	useEffectEvent,
 	useRef,
@@ -88,10 +89,20 @@ export function PostCard({
 			? `${app.sectionPlayback.sectionIndex}:${app.sectionPlayback.text}`
 			: "0";
 
-	useEffect(() => {
-		registerEl?.(post.id, articleRef.current);
-		return () => registerEl?.(post.id, null);
-	}, [post.id, registerEl]);
+	// A callback ref (rather than useEffect) registers the element
+	// synchronously during the commit phase, before layout effects run. This
+	// means the parent's active-post scroll-snap effect can find a
+	// freshly-mounted card's element on its very first pass instead of one
+	// render later (once a passive effect fires), closing a timing gap where
+	// the browser could paint with the wrong scroll position first.
+	const setArticleRef = useCallback(
+		(el: HTMLElement | null) => {
+			articleRef.current = el;
+			registerEl?.(post.id, el);
+			return () => registerEl?.(post.id, null);
+		},
+		[post.id, registerEl]
+	);
 
 	useEffect(() => {
 		if (app.appData)
@@ -215,6 +226,18 @@ export function PostCard({
 			mediaRef.current.syncCaptionLinkedImage(articleRef.current, word);
 	}, [captionIndex, active, app.appData]);
 
+	// onActivate's identity changes whenever the app context updates (it's
+	// recreated from useCallback([app])), which happens on nearly every state
+	// change. Keeping it out of the observer's dependency array (via a ref)
+	// avoids tearing down and recreating the IntersectionObserver on every
+	// render - recreating it re-reports the element's *current* intersection
+	// state, which can spuriously re-fire onActivate for a still-visible old
+	// card and revert a deliberate jump (e.g. from search) right after it happens.
+	const onActivateRef = useRef(onActivate);
+	useEffect(() => {
+		onActivateRef.current = onActivate;
+	}, [onActivate]);
+
 	useEffect(() => {
 		const el = articleRef.current;
 		if (!el) return;
@@ -228,13 +251,13 @@ export function PostCard({
 						best = entry.target;
 					}
 				});
-				if (best && bestRatio >= 0.6) onActivate(post.id);
+				if (best && bestRatio >= 0.6) onActivateRef.current(post.id);
 			},
 			{ root: el.parentElement, threshold: [0.6, 0.85, 1] }
 		);
 		io.observe(el);
 		return () => io.disconnect();
-	}, [post.id, onActivate]);
+	}, [post.id]);
 
 	const wordCount = Math.max(1, spokenText.trim().split(/\s+/).filter(Boolean).length);
 	const progress = wordCount > 1 ? (captionIndex / (wordCount - 1)) * 100 : 100;
@@ -336,7 +359,7 @@ export function PostCard({
 
 	return (
 		<article
-			ref={articleRef}
+			ref={setArticleRef}
 			className="post"
 			data-post-id={post.id}
 			data-slug={titleToSlug(post.title)}

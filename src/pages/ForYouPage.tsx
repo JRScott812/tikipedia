@@ -179,12 +179,32 @@ export function ForYouPage() {
 	// gets a chance to fire and revert activePostId back. Setting scrollTop
 	// directly (rather than scrollIntoView, which can be smooth-animated by the
 	// container's CSS scroll-behavior) guarantees an instant, synchronous jump.
+	//
+	// CSS scroll-snap (`scroll-snap-type: y mandatory` on .posts) fights this:
+	// the browser can re-snap the scroll position back to whichever card it
+	// still considers "settled" a moment after we set scrollTop, undoing the
+	// jump. Temporarily disabling snap for the duration of the jump (and
+	// re-enabling it a frame later, once the browser has accepted the new
+	// position) prevents that snap-back.
 	useLayoutEffect(() => {
 		if (app.activePostId == null) return;
 		const el = postEls.current.get(app.activePostId);
 		const root = rootRef.current;
 		if (!el || !root) return;
+		const prevSnap = root.style.scrollSnapType;
+		let raf2: number | undefined;
+		root.style.scrollSnapType = "none";
 		root.scrollTop = el.offsetTop;
+		const raf1 = requestAnimationFrame(() => {
+			root.scrollTop = el.offsetTop;
+			raf2 = requestAnimationFrame(() => {
+				root.style.scrollSnapType = prevSnap;
+			});
+		});
+		return () => {
+			cancelAnimationFrame(raf1);
+			if (raf2 != null) cancelAnimationFrame(raf2);
+		};
 	}, [app.activePostId, elVersion]);
 
 	if (prefetchSettled && app.posts.length === 0) {
