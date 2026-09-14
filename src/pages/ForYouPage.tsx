@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { PostCard } from "../components/PostCard";
 import { useApp } from "../context/AppContext";
@@ -174,19 +174,17 @@ export function ForYouPage() {
 	// Keep activeEl lookup fresh after registerEl updates the map.
 	void elVersion;
 
-	// When search / deep-link / related jumps to a post, snap it into the viewport.
-	// Retry via rAF in case the new card hasn't mounted yet when activePostId changes.
-	useEffect(() => {
+	// When search / deep-link / related jumps to a post, snap it into the viewport
+	// *before paint* so the still-visible old card's IntersectionObserver never
+	// gets a chance to fire and revert activePostId back. Setting scrollTop
+	// directly (rather than scrollIntoView, which can be smooth-animated by the
+	// container's CSS scroll-behavior) guarantees an instant, synchronous jump.
+	useLayoutEffect(() => {
 		if (app.activePostId == null) return;
-		const snap = () => {
-			const el = postEls.current.get(app.activePostId!);
-			if (el) {
-				el.scrollIntoView({ behavior: "auto", block: "start" });
-			}
-		};
-		snap();
-		const raf = requestAnimationFrame(snap);
-		return () => cancelAnimationFrame(raf);
+		const el = postEls.current.get(app.activePostId);
+		const root = rootRef.current;
+		if (!el || !root) return;
+		root.scrollTop = el.offsetTop;
 	}, [app.activePostId, elVersion]);
 
 	if (prefetchSettled && app.posts.length === 0) {
