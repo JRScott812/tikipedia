@@ -97,9 +97,18 @@ export function ForYouPage() {
 		location.pathname
 	]);
 
+	// Set right before a scroll-driven activation (from PostCard's
+	// IntersectionObserver) so the snap-to-active effect below can tell it
+	// apart from a programmatic jump (search / deep link / keyboard nav) and
+	// leave the browser's native scroll-snap alone - forcing scrollTop and
+	// disabling scroll-snap-type on every scroll-driven activation fights the
+	// user's own inertial scroll and breaks snapping to the next card.
+	const scrollDrivenRef = useRef(false);
+
 	const onActivate = useCallback(
 		(postId: number) => {
 			if (app.activePostId === postId) return;
+			scrollDrivenRef.current = true;
 			app.setActivePostId(postId);
 			app.setPaused(false);
 			app.setRate(1);
@@ -187,6 +196,16 @@ export function ForYouPage() {
 	// re-enabling it a frame later, once the browser has accepted the new
 	// position) prevents that snap-back.
 	useLayoutEffect(() => {
+		// Scroll-driven activations (the user swiping/scrolling to the next
+		// card) are already at the right scrollTop - the native CSS scroll-snap
+		// is handling the settle. Forcing scrollTop and toggling
+		// scroll-snap-type here on every such activation interrupts the
+		// browser's own snap/inertial scroll and is what breaks "snap to next
+		// card". Only run the forced jump for programmatic activations.
+		if (scrollDrivenRef.current) {
+			scrollDrivenRef.current = false;
+			return;
+		}
 		if (app.activePostId == null) return;
 		const el = postEls.current.get(app.activePostId);
 		const root = rootRef.current;
