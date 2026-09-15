@@ -2,7 +2,12 @@
  * Article image fetch, junk filtering, Commons thumbs, and slideshow helpers.
  * Pure URL helpers have no DOM deps; PostMediaController accepts element containers.
  */
-import { IMAGE_SLIDE_MS, LINK_IMAGE_LOOKAHEAD, LINK_IMAGE_MIN_MS } from "./config";
+import {
+	IMAGE_SLIDE_MS,
+	LINK_IMAGE_LOOKAHEAD,
+	LINK_IMAGE_MIN_MS,
+	MIN_IMAGE_DISPLAY_MS
+} from "./config";
 import { tagCaptionLinkWords } from "./speech";
 import type { Post, RelatedInSummary } from "../types/wiki";
 
@@ -214,6 +219,7 @@ export interface PostMediaControllerOptions {
 	slideMs?: number;
 	linkImageMinMs?: number;
 	linkLookahead?: number;
+	minImageDisplayMs?: number;
 	isPlaybackPaused?: () => boolean;
 	isActivePost?: (postEl: HTMLElement) => boolean;
 	getCaptionWords?: () => HTMLElement[];
@@ -223,11 +229,13 @@ export class PostMediaController {
 	private readonly slideMs: number;
 	private readonly linkImageMinMs: number;
 	private readonly linkLookahead: number;
+	private readonly minImageDisplayMs: number;
 
 	constructor(private readonly opts: PostMediaControllerOptions) {
 		this.slideMs = opts.slideMs ?? IMAGE_SLIDE_MS;
 		this.linkImageMinMs = opts.linkImageMinMs ?? LINK_IMAGE_MIN_MS;
 		this.linkLookahead = opts.linkLookahead ?? LINK_IMAGE_LOOKAHEAD;
+		this.minImageDisplayMs = opts.minImageDisplayMs ?? MIN_IMAGE_DISPLAY_MS;
 	}
 
 	stopImageSlideshow(postEl: HTMLElement | null | undefined): void {
@@ -263,7 +271,21 @@ export class PostMediaController {
 			if (img === next) img.dataset.active = "1";
 			else delete img.dataset.active;
 		});
+		next.dataset.shownAt = String(Date.now());
 		return i;
+	}
+
+	/** Milliseconds the currently-active image (base slide or linked art) has been shown. */
+	private currentImageShownMs(visual: HTMLElement): number {
+		const current = visual.querySelector<HTMLImageElement>("img.media[data-active]");
+		if (!current) return Infinity; // nothing active — don't block a swap
+		if (!current.dataset.shownAt) {
+			// First time we've checked this image (e.g. the eagerly-rendered lead
+			// thumbnail, which never goes through showSlideImage) — start its clock now.
+			current.dataset.shownAt = String(Date.now());
+			return 0;
+		}
+		return Date.now() - Number(current.dataset.shownAt);
 	}
 
 	makeMediaImg(src: string): MediaImg {
@@ -338,6 +360,7 @@ export class PostMediaController {
 			if (img === target) img.dataset.active = "1";
 			else delete img.dataset.active;
 		});
+		target.dataset.shownAt = String(Date.now());
 	}
 
 	clearLinkedArticleImage(postEl: HTMLElement): void {
@@ -408,9 +431,15 @@ export class PostMediaController {
 		const linkId = this.captionLinkIdNear(wordEl);
 		const host = postEl as PostMediaHost;
 		if (linkId) {
-			if (host._showingLink !== String(linkId))
+			if (host._showingLink !== String(linkId)) {
+				// Guard against replacing a just-shown image (e.g. the lead
+				// thumbnail) before the viewer has had a chance to see it —
+				// retried on every subsequent caption tick until it's due.
+				const visual = postEl.querySelector<HTMLElement>(".visual");
+				if (visual && this.currentImageShownMs(visual) < this.minImageDisplayMs)
+					return;
 				this.showLinkedArticleImage(postEl, linkId);
-			else if (host._linkClearTimer) {
+			} else if (host._linkClearTimer) {
 				clearTimeout(host._linkClearTimer);
 				host._linkClearTimer = null;
 			}

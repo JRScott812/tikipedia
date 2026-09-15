@@ -11,7 +11,8 @@ export function BottomNav() {
 		const first = rest[0] || "";
 		if (["profiles", "stats", "settings", "about", "following"].includes(first))
 			return first;
-		return "home";
+		if (first === "" || first === "p") return "home";
+		return first;
 	})();
 
 	const navBtn = (

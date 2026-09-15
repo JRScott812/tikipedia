@@ -24,6 +24,8 @@ function makePost(partial: Partial<Post> & Pick<Post, "id" | "title">): Post {
 		allCategories: new Set(),
 		seen: 0,
 		aliases: [],
+		editedAt: null,
+		watchers: null,
 		...partial
 	};
 }

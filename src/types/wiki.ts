@@ -22,6 +22,8 @@ export interface Settings {
 	captionStroke: number;
 	/** True after the user finishes (or skips) the start-screen topics picker. */
 	onboardingCompleted: boolean;
+	/** Topic-group ids explicitly followed as "accounts" on the Following page. */
+	followedAccounts: string[];
 }
 
 /** Per-language recommendation / engagement slice. */
@@ -94,6 +96,12 @@ export interface Post {
 	seen: number;
 	aliases: string[];
 	score?: number;
+	/** Last-edit timestamp (ISO 8601), used to show "posted" age TikTok-style. */
+	editedAt: string | null;
+	/** Approximate Wikipedia watcher count, used as a like-count stand-in. */
+	watchers: number | null;
+	/** Lazily-fetched lifetime pageview total, cached once resolved. */
+	views?: number;
 	_summaryLinkRefs?: WikiLinkRef[];
 	_relatedInSummary?: RelatedInSummary[];
 	/** In-session cache of top-level TOC after description sheet opens. */

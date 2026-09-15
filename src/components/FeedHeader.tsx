@@ -22,7 +22,6 @@ export function FeedHeader() {
 			className={`feedHeader${searchOpen ? " feedHeader--searchOpen" : ""}`}
 			aria-label="Feed"
 		>
-			<span className="feedBrand" role="img" aria-label="Tikipedia" />
 			<div className="feedTabs" role="navigation" aria-label="Current feed">
 				<NavLink
 					to="/following"

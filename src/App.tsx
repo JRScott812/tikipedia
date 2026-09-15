@@ -10,6 +10,7 @@ import { useApp } from "./context/AppContext";
 import { appPageDocumentTitle, FEED_DOCUMENT_TITLE } from "./lib/routes";
 import { syncDocumentMeta } from "./lib/site";
 import { AboutPage } from "./pages/AboutPage";
+import { AccountPage } from "./pages/AccountPage";
 import { FollowingPage } from "./pages/FollowingPage";
 import { ForYouPage } from "./pages/ForYouPage";
 import { PostRoutePage } from "./pages/PostRoutePage";
@@ -20,7 +21,9 @@ import { StatsPage } from "./pages/StatsPage";
 function pageFromPath(pathname: string): string {
 	const rest = pathname.replace(/\/+$/, "").split("/").filter(Boolean);
 	const first = rest[0] || "";
-	if (["profiles", "stats", "settings", "about", "following"].includes(first))
+	if (
+		["profiles", "stats", "settings", "about", "following", "account"].includes(first)
+	)
 		return first;
 	if (first === "p") return "foryou";
 	return "foryou";
@@ -40,7 +43,9 @@ function Layout() {
 
 	useEffect(() => {
 		document.body.dataset.page = page;
-		if (page !== "foryou") {
+		if (page === "account") {
+			// AccountPage owns its own document title/meta once the account resolves.
+		} else if (page !== "foryou") {
 			syncDocumentMeta({
 				title: appPageDocumentTitle(page),
 				path: location.pathname
@@ -149,6 +154,7 @@ export default function App() {
 			<Route element={<Layout />}>
 				<Route index element={<ForYouPage />} />
 				<Route path="following" element={<FollowingPage />} />
+				<Route path="account/:id" element={<AccountPage />} />
 				<Route path="profiles" element={<ProfilesPage />} />
 				<Route path="stats" element={<StatsPage />} />
 				<Route path="settings" element={<SettingsPage />} />

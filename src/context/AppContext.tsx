@@ -100,6 +100,7 @@ export type AppContextValue = {
 	getSpokenText: (post: Post) => string;
 	getSpokenSectionTitle: (post: Post) => string;
 	updateSettings: (patch: Partial<Settings>) => void;
+	toggleFollowAccount: (accountId: string) => void;
 	save: () => void;
 	likePost: (post: Post) => void;
 	dislikePost: (post: Post) => void;
@@ -420,6 +421,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		},
 		[updateSettings]
 	);
+
+	const toggleFollowAccount = useCallback((accountId: string) => {
+		setSettings((prev) => {
+			const following = prev.followedAccounts.includes(accountId);
+			const followedAccounts = following
+				? prev.followedAccounts.filter((id) => id !== accountId)
+				: [...prev.followedAccounts, accountId];
+			const next = { ...prev, followedAccounts };
+			settingsRef.current = next;
+			if (settingsHydrated.current) saveSettings(next);
+			return next;
+		});
+	}, []);
 
 	const setPaused = useCallback((paused: boolean) => {
 		setPlaybackPaused(paused);
@@ -1038,6 +1052,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			getSpokenText: getSpokenTextForPost,
 			getSpokenSectionTitle: getSpokenSectionTitleForPost,
 			updateSettings,
+			toggleFollowAccount,
 			save,
 			likePost,
 			dislikePost,
@@ -1097,6 +1112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			getSpokenTextForPost,
 			getSpokenSectionTitleForPost,
 			updateSettings,
+			toggleFollowAccount,
 			save,
 			likePost,
 			dislikePost,

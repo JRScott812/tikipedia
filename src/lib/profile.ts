@@ -27,7 +27,8 @@ export function defaultSettings(): Settings {
 		voiceAutoMatched: true,
 		captionSize: 1,
 		captionStroke: 2,
-		onboardingCompleted: false
+		onboardingCompleted: false,
+		followedAccounts: []
 	};
 }
 
@@ -64,6 +65,7 @@ export function loadSettings(wikiLanguages: WikiLang[]): Settings {
 	computed.captionSize = clampCaptionSize(computed.captionSize);
 	computed.captionStroke = clampCaptionStroke(computed.captionStroke);
 	if (!Array.isArray(computed.profiles)) computed.profiles = ["default"];
+	if (!Array.isArray(computed.followedAccounts)) computed.followedAccounts = [];
 	computed.storeData = computed.storeData !== false;
 	computed.openMainWiki = !!computed.openMainWiki;
 	computed.muted = !!computed.muted;

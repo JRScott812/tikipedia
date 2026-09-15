@@ -9,6 +9,9 @@ export const DOUBLE_TAP_MS = 260;
 export const IMAGE_SLIDE_MS = 3500;
 /** Minimum time to keep a caption-linked article image on screen. */
 export const LINK_IMAGE_MIN_MS = 2500;
+/** Minimum time any currently-shown image (including the lead thumbnail) must
+ *  stay up before a caption-linked article image is allowed to replace it. */
+export const MIN_IMAGE_DISPLAY_MS = 1500;
 /** Start showing a linked image this many caption words early. */
 export const LINK_IMAGE_LOOKAHEAD = 4;
 

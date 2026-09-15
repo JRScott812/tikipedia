@@ -69,6 +69,10 @@ interface MwPage {
 	links?: Array<{ title?: string }>;
 	pageimage?: string;
 	original?: { source?: string };
+	/** Last-edit timestamp (ISO 8601), returned free with prop=info. */
+	touched?: string;
+	/** Approximate watcher count, requires inprop=watchers. */
+	watchers?: number;
 }
 
 interface MwParseSection {
@@ -276,7 +280,12 @@ export function indexQueryPages(data: MwQueryData): {
 			images: prev?.images || (thumb ? [thumb] : []),
 			allCategories: prev?.allCategories || buildAllCategories([], page.pageid, []),
 			seen: prev?.seen || 0,
-			aliases: prev?.aliases || []
+			aliases: prev?.aliases || [],
+			editedAt: page.touched || prev?.editedAt || null,
+			watchers:
+				typeof page.watchers === "number"
+					? page.watchers
+					: (prev?.watchers ?? null)
 		});
 		if (!cached) continue;
 		addPageAlias(cached, page.title);
@@ -608,7 +617,9 @@ export function apiPageToPost(
 		images: thumb ? [thumb] : [],
 		allCategories: buildAllCategories(categories, apiPage.pageid, [], topicNoiseRe),
 		seen: 0,
-		aliases: [apiPage.title]
+		aliases: [apiPage.title],
+		editedAt: apiPage.touched || null,
+		watchers: typeof apiPage.watchers === "number" ? apiPage.watchers : null
 	};
 	return cachePage(post) ?? null;
 }
@@ -649,7 +660,8 @@ export async function hydrateByTitles(
 					pllimit: 50,
 					piprop: "thumbnail|name",
 					pithumbsize: 720,
-					ppprop: "disambiguation"
+					ppprop: "disambiguation",
+					inprop: "watchers"
 				},
 				settings
 			)) as MwQueryData;
@@ -695,7 +707,8 @@ export async function hydrateByPageIds(
 					pllimit: 50,
 					piprop: "thumbnail|name",
 					pithumbsize: 720,
-					ppprop: "disambiguation"
+					ppprop: "disambiguation",
+					inprop: "watchers"
 				},
 				settings
 			)) as MwQueryData;
@@ -946,7 +959,8 @@ export async function fetchRandomCandidates(
 				pllimit: 50,
 				piprop: "thumbnail|name",
 				pithumbsize: 720,
-				ppprop: "disambiguation"
+				ppprop: "disambiguation",
+				inprop: "watchers"
 			},
 			settings,
 			{ useCache: false }
@@ -988,7 +1002,8 @@ export async function fetchCategoryCandidates(
 				pllimit: 50,
 				piprop: "thumbnail|name",
 				pithumbsize: 720,
-				ppprop: "disambiguation"
+				ppprop: "disambiguation",
+				inprop: "watchers"
 			},
 			settings,
 			{ useCache: false }

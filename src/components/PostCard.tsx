@@ -6,6 +6,7 @@ import {
 	useState,
 	type PointerEvent as ReactPointerEvent
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { DOUBLE_TAP_MS } from "../lib/config";
 import {
@@ -14,6 +15,8 @@ import {
 	hydratePostImages,
 	normalizeFileTitle
 } from "../lib/media";
+import { formatCompactNumber, formatRelativeAge } from "../lib/format";
+import { fetchArticleLifetimeViews } from "../lib/popularity";
 import { titleToSlug } from "../lib/routes";
 import { buildCaptionWords } from "../lib/speech";
 import { classifyPostTopic } from "../lib/topics";
@@ -24,6 +27,7 @@ import {
 	wikiQuery
 } from "../lib/wiki";
 import type { Post } from "../types/wiki";
+import { AccountAvatar } from "./AccountAvatar";
 import { Icon } from "./Icon";
 
 type Props = {
@@ -47,13 +51,22 @@ export function PostCard({
 	registerEl
 }: Props) {
 	const app = useApp();
+	const navigate = useNavigate();
 	const articleRef = useRef<HTMLElement>(null);
 	const captionsRef = useRef<HTMLDivElement>(null);
 	const visualRef = useRef<HTMLDivElement>(null);
+	// The slideshow's setInterval callback is bound to whichever media
+	// controller instance was active when it started; recreating that
+	// instance later (e.g. below, when playbackPaused changes) does NOT
+	// retarget an already-running timer. Routing the paused check through a
+	// ref (rather than closing over `app.playbackPaused` directly) means
+	// every tick - regardless of which instance's closure is running - reads
+	// the live value instead of a frozen snapshot from whenever it started.
+	const playbackPausedRef = useRef(app.playbackPaused);
 	const mediaRef = useRef(
 		createPostMediaController({
 			junkImageRe: /(?!)/,
-			isPlaybackPaused: () => app.playbackPaused,
+			isPlaybackPaused: () => playbackPausedRef.current,
 			isActivePost: (el) => el === articleRef.current && active,
 			getCaptionWords: () => [
 				...(captionsRef.current?.querySelectorAll<HTMLElement>(".caption-word") ||
@@ -64,6 +77,9 @@ export function PostCard({
 	const [burst, setBurst] = useState<{ x: number; y: number } | null>(null);
 	const [pauseFlash, setPauseFlash] = useState(false);
 	const [toast, setToast] = useState<string | null>(null);
+	const [views, setViews] = useState<number | null>(
+		typeof post.views === "number" ? post.views : null
+	);
 	const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastTapAt = useRef(0);
@@ -105,10 +121,14 @@ export function PostCard({
 	);
 
 	useEffect(() => {
+		playbackPausedRef.current = app.playbackPaused;
+	}, [app.playbackPaused]);
+
+	useEffect(() => {
 		if (app.appData)
 			mediaRef.current = createPostMediaController({
 				junkImageRe: app.appData.junkImageRe,
-				isPlaybackPaused: () => app.playbackPaused,
+				isPlaybackPaused: () => playbackPausedRef.current,
 				isActivePost: (el) => el === articleRef.current && !!el.dataset.active,
 				getCaptionWords: () => [
 					...(captionsRef.current?.querySelectorAll<HTMLElement>(
@@ -116,7 +136,7 @@ export function PostCard({
 					) || [])
 				]
 			});
-	}, [app.appData, app.playbackPaused]);
+	}, [app.appData]);
 
 	const buildCaptions = useEffectEvent(() => {
 		const el = captionsRef.current;
@@ -181,6 +201,26 @@ export function PostCard({
 		// Re-hydrate when the post identity / wiki lang changes, not every settings object identity.
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- stable post.id + lang
 	}, [post.id, post.wikiLang, app.appData, app.settings.wikiLang]);
+
+	useEffect(() => {
+		if (typeof post.views === "number") {
+			setViews(post.views);
+			return;
+		}
+		let cancelled = false;
+		void fetchArticleLifetimeViews(
+			post.title,
+			post.wikiLang || app.settings.wikiLang
+		).then((v) => {
+			if (cancelled) return;
+			post.views = v;
+			setViews(v);
+		});
+		return () => {
+			cancelled = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the underlying article changes
+	}, [post.id, post.title, post.wikiLang, app.settings.wikiLang]);
 
 	useEffect(() => {
 		const article = articleRef.current;
@@ -263,6 +303,10 @@ export function PostCard({
 	const progress = wordCount > 1 ? (captionIndex / (wordCount - 1)) * 100 : 100;
 
 	const initialFile = normalizeFileTitle(post.thumb);
+	const viewsLabel = views != null ? `${formatCompactNumber(views)} views` : null;
+	const ageLabel = formatRelativeAge(post.editedAt);
+	const likeCountLabel =
+		post.watchers != null ? formatCompactNumber(post.watchers) : null;
 
 	const onPointerDown = (e: ReactPointerEvent) => {
 		if (
@@ -476,6 +520,15 @@ export function PostCard({
 						{topic?.label || ""}
 					</p>
 					<h1>{post.title}</h1>
+					{viewsLabel || ageLabel ? (
+						<p className="postStatsLine">
+							{viewsLabel ? <span>{viewsLabel}</span> : null}
+							{viewsLabel && ageLabel ? (
+								<span aria-hidden="true"> · </span>
+							) : null}
+							{ageLabel ? <span>{ageLabel}</span> : null}
+						</p>
+					) : null}
 					{active ? (
 						<p className="sectionLabel" aria-live="polite">
 							{sectionTitle}
@@ -487,23 +540,32 @@ export function PostCard({
 			</div>
 
 			<div className="sideActions">
-				<div
+				<button
+					type="button"
 					className="wikiAvatar"
-					role="img"
-					aria-label={topic?.label || "Topic"}
+					aria-label={topic ? `Open ${topic.label} account` : "Topic"}
 					title={topic?.label || ""}
 					style={
 						topic
 							? { ["--avatar-accent" as string]: topic.accent }
 							: undefined
 					}
+					onClick={(e) => {
+						e.stopPropagation();
+						if (topic) navigate(`/account/${topic.id}`);
+					}}
+					disabled={!topic}
 				>
-					{topic?.emoji || "✨"}
-				</div>
+					{topic ? (
+						<AccountAvatar group={topic} size={44} />
+					) : (
+						<span aria-hidden="true">✨</span>
+					)}
+				</button>
 				<Action
 					className="likeBtn"
 					icon={liked ? "heart-fill" : "heart"}
-					label={liked ? "Liked" : "Like"}
+					label={likeCountLabel ?? (liked ? "Liked" : "Like")}
 					ariaLabel={liked ? "Unlike" : "Like"}
 					ariaPressed={liked}
 					dataAttrs={liked ? { liked: "1" } : {}}
