@@ -2,12 +2,17 @@ name: CI
 
 on:
     push:
-        branches: [mane ]
+        branches: [mane]
     pull_request:
 
 concurrency:
     group: ci-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
 
 jobs:
     verify:
@@ -17,7 +22,7 @@ jobs:
 
             - uses: actions/setup-node@v6
               with:
-                  node-version: 24
+                  node-version: 22
                   cache: npm
 
             - name: Install dependencies
@@ -38,3 +43,21 @@ jobs:
                   name: lighthouse-reports
                   path: .lighthouseci
                   if-no-files-found: ignore
+
+            - name: Upload Pages artifact
+              if: github.event_name == 'push' && github.ref == 'refs/heads/mane'
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: dist
+
+    deploy:
+        needs: verify
+        if: github.event_name == 'push' && github.ref == 'refs/heads/mane'
+        runs-on: ubuntu-latest
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
