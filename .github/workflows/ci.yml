@@ -2,7 +2,7 @@ name: CI
 
 on:
     push:
-        branches: [main, master, "React-and-TS-API-Version"]
+        branches: [mane ]
     pull_request:
 
 concurrency:
@@ -13,11 +13,11 @@ jobs:
     verify:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: npm
 
             - name: Install dependencies
