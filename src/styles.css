@@ -136,6 +136,7 @@ body {
 	max-width: 520px;
 	margin: 0 auto;
 	overflow-y: auto;
+	overflow-anchor: none;
 	scroll-snap-type: y mandatory;
 	scroll-behavior: smooth;
 	overscroll-behavior-y: contain;
