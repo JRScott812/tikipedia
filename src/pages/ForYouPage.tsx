@@ -97,18 +97,15 @@ export function ForYouPage() {
 		location.pathname
 	]);
 
-	// Set right before a scroll-driven activation (from PostCard's
-	// IntersectionObserver) so the snap-to-active effect below can tell it
-	// apart from a programmatic jump (search / deep link / keyboard nav) and
-	// leave the browser's native scroll-snap alone - forcing scrollTop and
-	// disabling scroll-snap-type on every scroll-driven activation fights the
-	// user's own inertial scroll and breaks snapping to the next card.
-	const scrollDrivenRef = useRef(false);
+	// The post whose position the scroll container already reflects. Scroll-driven
+	// activations set it so only programmatic changes (search, related links,
+	// deep links) trigger a forced jump.
+	const syncedPostIdRef = useRef<number | null>(null);
 
 	const onActivate = useCallback(
 		(postId: number) => {
 			if (app.activePostId === postId) return;
-			scrollDrivenRef.current = true;
+			syncedPostIdRef.current = postId;
 			app.setActivePostId(postId);
 			app.setPaused(false);
 			app.setRate(1);
@@ -183,47 +180,28 @@ export function ForYouPage() {
 	// Keep activeEl lookup fresh after registerEl updates the map.
 	void elVersion;
 
-	// When search / deep-link / related jumps to a post, snap it into the viewport
-	// *before paint* so the still-visible old card's IntersectionObserver never
-	// gets a chance to fire and revert activePostId back. Setting scrollTop
-	// directly (rather than scrollIntoView, which can be smooth-animated by the
-	// container's CSS scroll-behavior) guarantees an instant, synchronous jump.
-	//
-	// CSS scroll-snap (`scroll-snap-type: y mandatory` on .posts) fights this:
-	// the browser can re-snap the scroll position back to whichever card it
-	// still considers "settled" a moment after we set scrollTop, undoing the
-	// jump. Temporarily disabling snap for the duration of the jump (and
-	// re-enabling it a frame later, once the browser has accepted the new
-	// position) prevents that snap-back.
+	// Programmatic jumps (search, related links, deep links): instantly scroll the
+	// new active card into view before paint. Smooth scrolling and snapping are
+	// suspended for the jump so neither animates or snaps back, and restored
+	// right after. Re-runs caused by new cards mounting (elVersion) are no-ops
+	// once the active post is synced, so they never yank a user's scroll.
 	useLayoutEffect(() => {
-		// Scroll-driven activations (the user swiping/scrolling to the next
-		// card) are already at the right scrollTop - the native CSS scroll-snap
-		// is handling the settle. Forcing scrollTop and toggling
-		// scroll-snap-type here on every such activation interrupts the
-		// browser's own snap/inertial scroll and is what breaks "snap to next
-		// card". Only run the forced jump for programmatic activations.
-		if (scrollDrivenRef.current) {
-			scrollDrivenRef.current = false;
-			return;
-		}
-		if (app.activePostId == null) return;
-		const el = postEls.current.get(app.activePostId);
+		const id = app.activePostId;
+		if (id == null || syncedPostIdRef.current === id) return;
+		const el = postEls.current.get(id);
 		const root = rootRef.current;
 		if (!el || !root) return;
-		const prevSnap = root.style.scrollSnapType;
-		let raf2: number | undefined;
+		syncedPostIdRef.current = id;
 		root.style.scrollSnapType = "none";
+		root.style.scrollBehavior = "auto";
 		root.scrollTop = el.offsetTop;
-		const raf1 = requestAnimationFrame(() => {
+		requestAnimationFrame(() => {
 			root.scrollTop = el.offsetTop;
-			raf2 = requestAnimationFrame(() => {
-				root.style.scrollSnapType = prevSnap;
+			requestAnimationFrame(() => {
+				root.style.scrollSnapType = "";
+				root.style.scrollBehavior = "";
 			});
 		});
-		return () => {
-			cancelAnimationFrame(raf1);
-			if (raf2 != null) cancelAnimationFrame(raf2);
-		};
 	}, [app.activePostId, elVersion]);
 
 	if (prefetchSettled && app.posts.length === 0) {
